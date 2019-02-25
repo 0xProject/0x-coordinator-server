@@ -1,0 +1,10 @@
+{
+    "type": "sqlite",
+    "database": "database.sqlite",
+    "synchronize": true,
+    "logging": true,
+    "entities": ["ts/lib/src/entities/**/*.js"],
+    "cli": {
+        "entitiesDir": "ts/lib/src/entities"
+    }
+}
