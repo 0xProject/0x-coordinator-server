@@ -39,12 +39,8 @@ export class Handlers {
                 return decodedCalldata.functionArguments.orders;
 
             case 'matchOrders':
-                // HACK(fabio): The ABI decoder we use cannot distinguish between the
-                // matchOrders function in Exchange and the identically named function
-                // in our Auction contract, and it always decodes them using the Auction
-                // contract param names. We rename them to `leftOrder` and `rightOrder` here.
-                const leftOrder = decodedCalldata.functionArguments.buyOrder;
-                const rightOrder = decodedCalldata.functionArguments.sellOrder;
+                const leftOrder = decodedCalldata.functionArguments.leftOrder;
+                const rightOrder = decodedCalldata.functionArguments.rightOrder;
                 return [leftOrder, rightOrder];
 
             default:
@@ -85,7 +81,9 @@ export class Handlers {
         const signedTransaction = req.body.signedTransaction;
         let decodedCalldata: DecodedCalldata;
         try {
-            decodedCalldata = this._contractWrappers.getAbiDecoder().decodeCalldataOrThrow(signedTransaction.data);
+            decodedCalldata = this._contractWrappers
+                .getAbiDecoder()
+                .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
         } catch (err) {
             res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.DecodingTransactionFailed);
             return;
