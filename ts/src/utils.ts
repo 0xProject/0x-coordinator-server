@@ -32,6 +32,9 @@ export const utils = {
     isTECFeeRecipient(feeRecipientAddress: string): boolean {
         return feeRecipientAddress === FEE_RECIPIENT;
     },
+    async sleepAsync(miliseconds: number): Promise<void> {
+        await new Promise(resolve => setTimeout(resolve, miliseconds));
+    },
 };
 
 function schemaValidationErrorToValidationErrorItem(schemaValidationError: SchemaValidationError): ValidationErrorItem {

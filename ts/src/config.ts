@@ -43,8 +43,10 @@ export const FEE_RECIPIENT_PRIVATE_KEY = assertEnvVarType(
     EnvVarType.FeeRecipientPrivateKey,
 );
 
-// Default ERC20 token precision
-export const DEFAULT_ERC20_TOKEN_PRECISION = 18;
+// Optional selective delay on fill requests
+export const SELECTIVE_DELAY_MS = _.isEmpty(process.env.SELECTIVE_DELAY_MS)
+    ? 1000
+    : assertEnvVarType('SELECTIVE_DELAY_MS', process.env.SELECTIVE_DELAY_MS, EnvVarType.Integer);
 
 function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): any {
     let returnValue;

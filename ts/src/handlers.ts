@@ -8,7 +8,7 @@ import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { FEE_RECIPIENT, NETWORK_ID } from './config.js';
+import { FEE_RECIPIENT, NETWORK_ID, SELECTIVE_DELAY_MS } from './config.js';
 import { fillRequest } from './models/fill_request.js';
 import { signedOrder } from './models/signed_order';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
@@ -174,6 +174,7 @@ export class Handlers {
                 };
             }
         }
+        await utils.sleepAsync(SELECTIVE_DELAY_MS); // Add selective delay
         const response = await this._generateAndStoreSignatureAsync(signedTransaction, orders);
         return {
             status: HttpStatus.OK,
