@@ -5,7 +5,7 @@ import * as _ from 'lodash';
 
 enum EnvVarType {
     Port,
-    NetworkId,
+    Integer,
     FeeRecipient,
     FeeRecipientPrivateKey,
     UnitAmount,
@@ -20,7 +20,7 @@ export const HTTP_PORT = _.isEmpty(process.env.HTTP_PORT)
 // Default network id to use when not specified
 export const NETWORK_ID = _.isEmpty(process.env.NETWORK_ID)
     ? 42
-    : assertEnvVarType('NETWORK_ID', process.env.NETWORK_ID, EnvVarType.NetworkId);
+    : assertEnvVarType('NETWORK_ID', process.env.NETWORK_ID, EnvVarType.Integer);
 
 // Ethereum RPC url
 export const RPC_URL = _.isEmpty(process.env.RPC_URL)
@@ -61,7 +61,7 @@ function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): a
             }
             return returnValue;
 
-        case EnvVarType.NetworkId:
+        case EnvVarType.Integer:
             try {
                 returnValue = parseInt(value, 10);
             } catch (err) {
