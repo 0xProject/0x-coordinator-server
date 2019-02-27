@@ -1,26 +1,32 @@
 import { ContractWrappers, DecodedCalldata, signatureUtils, transactionHashUtils } from '0x.js';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { eip712Utils } from '@0x/order-utils';
-import { Order, SignedZeroExTransaction } from '@0x/types';
-import { signTypedDataUtils } from '@0x/utils';
+import { OrderWithoutExchangeAddress, SignedZeroExTransaction } from '@0x/types';
+import { BigNumber, signTypedDataUtils } from '@0x/utils';
 import { Provider } from 'ethereum-types';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { FEE_RECIPIENT, NETWORK_ID, SELECTIVE_DELAY_MS } from './config.js';
+import { EXPIRATION_DURATION_SECONDS, FEE_RECIPIENT, NETWORK_ID, SELECTIVE_DELAY_MS } from './config.js';
 import { fillRequest } from './models/fill_request.js';
 import { signedOrder } from './models/signed_order';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
-import { RequestTransactionErrors, RequestTransactionResponse, Response, TECApproval } from './types';
+import {
+    BroadcastCallback,
+    EventTypes,
+    RequestTransactionErrors,
+    RequestTransactionResponse,
+    Response,
+    TECApproval,
+} from './types';
 import { utils } from './utils';
-
-const EXPIRATION_DURATION = 60 * 1; // 1 min
 
 export class Handlers {
     private readonly _provider: Provider;
+    private _broadcastCallback: BroadcastCallback;
     private readonly _contractWrappers: ContractWrappers;
-    private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): Order[] {
+    private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): OrderWithoutExchangeAddress[] {
         switch (decodedCalldata.functionName) {
             case 'fillOrder':
             case 'fillOrKillOrder':
@@ -47,28 +53,9 @@ export class Handlers {
                 throw new Error(RequestTransactionErrors.InvalidFunctionCall);
         }
     }
-    private static async _handleCancelsAsync(
-        orders: Order[],
-        signedTransaction: SignedZeroExTransaction,
-    ): Promise<Response> {
-        for (const order of orders) {
-            if (!utils.isTECFeeRecipient(order.feeRecipientAddress)) {
-                continue;
-            }
-            if (signedTransaction.signerAddress !== order.makerAddress) {
-                return {
-                    status: HttpStatus.BAD_REQUEST,
-                    body: RequestTransactionErrors.CancellationTransactionNotSignedByMaker,
-                };
-            }
-            await signedOrder.cancelAsync(order);
-        }
-        return {
-            status: HttpStatus.OK,
-        };
-    }
-    constructor(provider: Provider) {
+    constructor(provider: Provider, broadcastCallback: BroadcastCallback) {
         this._provider = provider;
+        this._broadcastCallback = broadcastCallback;
         this._contractWrappers = new ContractWrappers(provider, {
             networkId: NETWORK_ID,
         });
@@ -78,7 +65,10 @@ export class Handlers {
         utils.validateSchema(req.body, requestTransactionSchema);
 
         // 2. Decode the supplied transaction data
-        const signedTransaction = req.body.signedTransaction;
+        const signedTransaction: SignedZeroExTransaction = {
+            ...req.body.signedTransaction,
+            salt: new BigNumber(req.body.signedTransaction.salt),
+        };
         let decodedCalldata: DecodedCalldata;
         try {
             decodedCalldata = this._contractWrappers
@@ -90,15 +80,15 @@ export class Handlers {
         }
 
         // 3. Check if at least one order in calldata has the TEC's feeRecipientAddress
-        let orders: Order[] = [];
+        let orders: OrderWithoutExchangeAddress[] = [];
         try {
             orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata);
         } catch (err) {
             res.status(HttpStatus.BAD_REQUEST).send(err.message);
             return;
         }
-        const hasTECOrders = _.some(orders, order => utils.isTECFeeRecipient(order.feeRecipientAddress));
-        if (!hasTECOrders) {
+        const tecOrders = _.filter(orders, order => utils.isTECFeeRecipient(order.feeRecipientAddress));
+        if (_.isEmpty(tecOrders)) {
             res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.TECFeeRecipientNotFound);
             return;
         }
@@ -131,26 +121,31 @@ export class Handlers {
             case 'marketBuyOrders':
             case 'marketBuyOrdersNoThrow':
             case 'matchOrders': {
-                const response = await this._handleFillsAsync(orders, signedTransaction);
+                const response = await this._handleFillsAsync(
+                    decodedCalldata.functionName,
+                    tecOrders,
+                    signedTransaction,
+                );
                 res.status(response.status).send(response.body);
+                // After responding to taker's request, we broadcast the fill acceptance to all WS connections
+                const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
+                const fillRequestAcceptedEvent = {
+                    type: EventTypes.FillRequestAccepted,
+                    data: {
+                        functionName: decodedCalldata.functionName,
+                        ordersWithoutExchangeAddress: tecOrders,
+                        zeroExTransaction: unsignedTransaction,
+                        tecSignature: response.body.signature,
+                        tecSignatureExpiration: response.body.expiration,
+                    },
+                };
+                this._broadcastCallback(fillRequestAcceptedEvent);
                 return;
             }
 
-            case 'cancelOrder': {
-                const order = orders[0];
-                if (signedTransaction.signerAddress !== order.makerAddress) {
-                    res.status(HttpStatus.BAD_REQUEST).send(
-                        RequestTransactionErrors.CancellationTransactionNotSignedByMaker,
-                    );
-                    return;
-                }
-                await signedOrder.cancelAsync(order);
-                res.status(HttpStatus.OK).send();
-                return;
-            }
-
+            case 'cancelOrder':
             case `batchCancelOrders`: {
-                const response = await Handlers._handleCancelsAsync(orders, signedTransaction);
+                const response = await this._handleCancelsAsync(tecOrders, signedTransaction);
                 res.status(response.status).send(response.body);
                 return;
             }
@@ -160,11 +155,42 @@ export class Handlers {
                 return;
         }
     }
-    private async _handleFillsAsync(orders: Order[], signedTransaction: SignedZeroExTransaction): Promise<Response> {
-        for (const order of orders) {
-            if (!utils.isTECFeeRecipient(order.feeRecipientAddress)) {
-                continue;
+    private async _handleCancelsAsync(
+        tecOrders: OrderWithoutExchangeAddress[],
+        signedTransaction: SignedZeroExTransaction,
+    ): Promise<Response> {
+        for (const order of tecOrders) {
+            try {
+                if (signedTransaction.signerAddress !== order.makerAddress) {
+                    throw new Error(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
+                }
+            } catch (err) {
+                return {
+                    status: HttpStatus.BAD_REQUEST,
+                    body: err.message,
+                };
             }
+            await signedOrder.cancelAsync(order);
+        }
+        const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
+        const cancelRequestAccepted = {
+            type: EventTypes.CancelRequestAccepted,
+            data: {
+                ordersWithoutExchangeAddress: tecOrders,
+                zeroExTransaction: unsignedTransaction,
+            },
+        };
+        this._broadcastCallback(cancelRequestAccepted);
+        return {
+            status: HttpStatus.OK,
+        };
+    }
+    private async _handleFillsAsync(
+        functionName: string,
+        tecOrders: OrderWithoutExchangeAddress[],
+        signedTransaction: SignedZeroExTransaction,
+    ): Promise<Response> {
+        for (const order of tecOrders) {
             // If cancelled, reject the request
             const isCancelled = await signedOrder.isCancelledAsync(order);
             if (isCancelled) {
@@ -174,8 +200,18 @@ export class Handlers {
                 };
             }
         }
+        const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
+        const fillRequestReceivedEvent = {
+            type: EventTypes.FillRequestReceived,
+            data: {
+                functionName,
+                ordersWithoutExchangeAddress: tecOrders,
+                zeroExTransaction: unsignedTransaction,
+            },
+        };
+        this._broadcastCallback(fillRequestReceivedEvent);
         await utils.sleepAsync(SELECTIVE_DELAY_MS); // Add selective delay
-        const response = await this._generateAndStoreSignatureAsync(signedTransaction, orders);
+        const response = await this._generateAndStoreSignatureAsync(signedTransaction, tecOrders);
         return {
             status: HttpStatus.OK,
             body: response,
@@ -183,10 +219,10 @@ export class Handlers {
     }
     private async _generateAndStoreSignatureAsync(
         signedTransaction: SignedZeroExTransaction,
-        orders: Order[],
+        orders: OrderWithoutExchangeAddress[],
     ): Promise<RequestTransactionResponse> {
         // generate signature & expiry and add to DB
-        const approvalExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + EXPIRATION_DURATION;
+        const approvalExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + EXPIRATION_DURATION_SECONDS;
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const tecApproval: TECApproval = {
             transactionHash,

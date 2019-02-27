@@ -48,6 +48,10 @@ export const SELECTIVE_DELAY_MS = _.isEmpty(process.env.SELECTIVE_DELAY_MS)
     ? 1000
     : assertEnvVarType('SELECTIVE_DELAY_MS', process.env.SELECTIVE_DELAY_MS, EnvVarType.Integer);
 
+export const EXPIRATION_DURATION_SECONDS = _.isEmpty(process.env.EXPIRATION_DURATION_SECONDS)
+    ? 60 // 1 minute
+    : assertEnvVarType('EXPIRATION_DURATION_SECONDS', process.env.EXPIRATION_DURATION_SECONDS, EnvVarType.Integer);
+
 function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): any {
     let returnValue;
     switch (expectedType) {

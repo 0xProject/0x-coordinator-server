@@ -1,4 +1,4 @@
-import { Order } from '@0x/types';
+import { OrderWithoutExchangeAddress } from '@0x/types';
 import * as _ from 'lodash';
 
 import { getDBConnection } from '../db_connection';
@@ -20,7 +20,7 @@ export const fillRequest = {
         signature: string,
         expiration: number,
         takerAddress: string,
-        orders: Order[],
+        orders: OrderWithoutExchangeAddress[],
     ): Promise<FillRequestEntity> {
         let fillRequestEntity = new FillRequestEntity();
         fillRequestEntity.signature = signature;

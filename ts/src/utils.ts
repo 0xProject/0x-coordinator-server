@@ -1,4 +1,5 @@
 import { Schema, SchemaValidator } from '@0x/json-schemas';
+import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
 
@@ -34,6 +35,22 @@ export const utils = {
     },
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise(resolve => setTimeout(resolve, miliseconds));
+    },
+    getOrderWithoutExchangeAddress(signedOrder: SignedOrder): OrderWithoutExchangeAddress {
+        const orderWithoutExchangeAddress = {
+            ...signedOrder,
+        };
+        delete orderWithoutExchangeAddress.exchangeAddress;
+        delete orderWithoutExchangeAddress.signature;
+        return orderWithoutExchangeAddress;
+    },
+    getUnsignedTransaction(signedTransaction: SignedZeroExTransaction): ZeroExTransaction {
+        const unsignedTransaction = _.clone(signedTransaction);
+        delete unsignedTransaction.signature;
+        return unsignedTransaction;
+    },
+    getUnmarshalledObject(o: any): any {
+        return JSON.parse(JSON.stringify(o));
     },
 };
 

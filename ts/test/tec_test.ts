@@ -1,7 +1,8 @@
-import { assetDataUtils, ContractWrappers, SignatureType } from '0x.js';
+import { assetDataUtils, ContractWrappers, SignatureType, ZeroExTransaction } from '0x.js';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { constants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
+import { BigNumber, fetchAsync } from '@0x/utils';
 import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
@@ -13,13 +14,14 @@ import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 import 'mocha';
 import * as request from 'supertest';
+import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
 import { FEE_RECIPIENT } from '../src/config';
 import { FillRequestEntity } from '../src/entities/fill_request_entity';
 import { fillRequest } from '../src/models/fill_request';
 import { signedOrder } from '../src/models/signed_order';
-import { RequestTransactionErrors } from '../src/types';
+import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, RequestTransactionErrors } from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
@@ -50,11 +52,16 @@ let contractAddresses: ContractAddresses;
 let blockchainLifecycle: BlockchainLifecycle;
 let contractWrappers: ContractWrappers;
 
+// Websocket tests only
+const TEST_PORT = 8361;
+const REQUESTS_PATH = '/v1/requests';
+let wsClient: WebSocket.w3cwebsocket;
+
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x1e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0xbe0037eaf2d64fe5529bca93c18c9702d3930376';
 const NOT_TEC_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
 
-describe('Server', () => {
+describe('TEC server', () => {
     before(async () => {
         provider = web3Factory.getRpcProvider({
             shouldUseInProcessGanache: true,
@@ -65,7 +72,6 @@ describe('Server', () => {
         // TODO(fabio): Fix Web3Wrapper incompatability issues
         blockchainLifecycle = new BlockchainLifecycle(web3Wrapper as any);
 
-        app = await getAppAsync(provider);
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
         [owner, senderAddress, makerAddress, takerAddress, tecSignerAddress] = _.slice(accounts, 0, 6);
@@ -99,11 +105,16 @@ describe('Server', () => {
         await blockchainLifecycle.revertAsync();
     });
     describe('#/v1/request_transaction', () => {
+        before(async () => {
+            app = await getAppAsync(provider);
+        });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
             const invalidBody = {
                 signedTransaction: {
                     // Missing signerAddress
-                    salt: '10798369788836331947878244228295394663118854512666292664573150674534689981547',
+                    salt: new BigNumber(
+                        '10798369788836331947878244228295394663118854512666292664573150674534689981547',
+                    ),
                     data:
                         '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c5f2b93a6902335d6d05d92895df0a8c381bfc14c342d58df4f926ee938fa1871677f7c000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b1b52aa1994a139883072845a049e4bfda827a5ab435a7f417e37c7bc18663362306d5a9e50f8aa110330987731be51dbfe69a2a0de2c4103da79dbb42b3070b203000000000000000000000000000000000000000000000000000000000000',
                     verifyingContractAddress: '0x48bacb9266a570d521063ef5dd96e61686dbe788',
@@ -119,7 +130,9 @@ describe('Server', () => {
         it('should return 400 Bad Request if signature is invalid', async () => {
             const invalidBody = {
                 signedTransaction: {
-                    salt: '57466949743788259527933166264332732046478076361192368690875627090773188231774',
+                    salt: new BigNumber(
+                        '57466949743788259527933166264332732046478076361192368690875627090773188231774',
+                    ),
                     signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
                     data:
                         '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c6dfa8c3aeb4634b714b7f4f0b235cf8b77707f0c8d36d1ea8b28b44560c5caa323d855000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b2f1cd06f64e08a71d6cb579a086c356f313ebc2aeeb66a827408aab78439ec7724dfd59fbad7a4c8009f893f724cab90d0f82f45c49f9f76c7e1d7a2c7f2ca4203000000000000000000000000000000000000000000000000000000000000',
@@ -363,4 +376,127 @@ describe('Server', () => {
             // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
         });
     });
+    describe(REQUESTS_PATH, () => {
+        before(async () => {
+            app = await getAppAsync(provider);
+            app.listen(TEST_PORT, () => {
+                utils.log(`TEC SERVER API (HTTP) listening on port ${TEST_PORT}`);
+            });
+        });
+        beforeEach(async () => {
+            wsClient = new WebSocket.w3cwebsocket(`ws://127.0.0.1:${TEST_PORT}${REQUESTS_PATH}`);
+        });
+        afterEach(async () => {
+            wsClient.close();
+        });
+        it('should emit WS event when valid fill request received and again after the selective delay', async () => {
+            // Register an onMessage handler to the WS client
+            const messageCount = 2;
+            const clientOnMessagePromises = onMessage(wsClient, messageCount);
+
+            // Send fill request
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount.div(2);
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
+            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
+            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const body = {
+                signedTransaction,
+            };
+            const headers = new Headers({
+                'content-type': 'application/json',
+            });
+            await fetchAsync(`http://127.0.0.1:${TEST_PORT}/v1/request_transaction`, {
+                headers,
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+
+            // Check that received event broadcast
+            const FillRequestReceivedEventMessage = await clientOnMessagePromises[0];
+            const fillRequestReceivedEvent = JSON.parse(FillRequestReceivedEventMessage.data);
+            const unsignedTransaction = utils.getUnmarshalledObject(utils.getUnsignedTransaction(signedTransaction));
+            const orderWithoutExchangeAddress = utils.getOrderWithoutExchangeAddress(order);
+            const expectedFillRequestReceivedEvent: FillRequestReceivedEvent = {
+                type: EventTypes.FillRequestReceived,
+                data: {
+                    functionName: 'fillOrder',
+                    ordersWithoutExchangeAddress: [utils.getUnmarshalledObject(orderWithoutExchangeAddress)],
+                    zeroExTransaction: unsignedTransaction as ZeroExTransaction,
+                },
+            };
+            expect(fillRequestReceivedEvent).to.be.deep.equal(expectedFillRequestReceivedEvent);
+
+            // Check that accepted event broadcast
+            const FillRequestAcceptedEventMessage = await clientOnMessagePromises[1];
+            const fillRequestAcceptedEvent = JSON.parse(FillRequestAcceptedEventMessage.data);
+            expect(fillRequestAcceptedEvent.type).to.be.equal(EventTypes.FillRequestAccepted);
+            expect(fillRequestAcceptedEvent.data.tecSignature).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.tecSignatureExpiration).to.not.be.undefined();
+        });
+        it('should emit WS event when valid cancel request accepted', async () => {
+            // Register an onMessage handler to the WS client
+            const messageCount = 1;
+            const clientOnMessagePromises = onMessage(wsClient, messageCount);
+
+            // Send fill request
+            const order = await orderFactory.newSignedOrderAsync();
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const cancelTxData = transactionEncoder.cancelOrderTx(order);
+            const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
+            transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
+            const signedTransaction = transactionFactory.newSignedTransaction(cancelTxData, SignatureType.EthSign);
+            const body = {
+                signedTransaction,
+            };
+            const headers = new Headers({
+                'content-type': 'application/json',
+            });
+            await fetchAsync(`http://127.0.0.1:${TEST_PORT}/v1/request_transaction`, {
+                headers,
+                method: 'POST',
+                body: JSON.stringify(body),
+            });
+
+            // Check that received event broadcast
+            const cancelRequestAcceptedEventMessage = await clientOnMessagePromises[0];
+            const cancelRequestAcceptedEvent = JSON.parse(cancelRequestAcceptedEventMessage.data);
+            const unsignedTransaction = utils.getUnmarshalledObject(utils.getUnsignedTransaction(signedTransaction));
+            const orderWithoutExchangeAddress = utils.getOrderWithoutExchangeAddress(order);
+            const expectedCancelRequestAcceptedEvent: CancelRequestAccepted = {
+                type: EventTypes.CancelRequestAccepted,
+                data: {
+                    ordersWithoutExchangeAddress: [utils.getUnmarshalledObject(orderWithoutExchangeAddress)],
+                    zeroExTransaction: unsignedTransaction as ZeroExTransaction,
+                },
+            };
+            expect(cancelRequestAcceptedEvent).to.be.deep.equal(expectedCancelRequestAcceptedEvent);
+        });
+    });
 });
+
+interface WsMessage {
+    data: string;
+}
+
+function onMessage(client: WebSocket.w3cwebsocket, messageNumber: number): Array<Promise<WsMessage>> {
+    const promises = [];
+    const resolves: Array<(msg: any) => void> = [];
+    for (let i = 0; i < messageNumber; i++) {
+        const p = new Promise<WsMessage>(resolve => {
+            resolves.push(resolve);
+        });
+        promises.push(p);
+    }
+
+    let j = 0;
+    client.onmessage = (msg: WsMessage) => {
+        const resolve = resolves[j];
+        resolve(msg);
+        j++;
+    };
+
+    return promises;
+}
