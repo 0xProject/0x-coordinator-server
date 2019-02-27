@@ -13,7 +13,11 @@ import { BroadcastMessage } from './types';
 
 const connectionStore: Set<WebSocket.connection> = new Set();
 
-export async function getAppAsync(provider: Provider): Promise<any> {
+/**
+ * Creates a new express app/server
+ * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing TEC approvals
+ */
+export async function getAppAsync(provider: Provider): Promise<http.Server> {
     if (!hasDBConnection()) {
         await initDBConnectionAsync();
     }

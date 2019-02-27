@@ -3,6 +3,10 @@ import { Connection, createConnection } from 'typeorm';
 
 let connectionIfExists: Connection | undefined;
 
+/**
+ * Checks if a connection already exists
+ * @return Whether a connection exists
+ */
 export function hasDBConnection(): boolean {
     return !_.isUndefined(connectionIfExists);
 }

@@ -9,7 +9,7 @@
         "watch": "tsc -w -p ts/tsconfig.json",
         "prettier": "prettier --write 'ts/**/*.ts' --config .prettierrc",
         "start": "node -r dotenv/config ts/lib/index.js",
-        "lint": "tslint --project ts --format stylish",
+        "lint": "tslint --project ts --format stylish --exclude ts/src/schemas/**/*",
         "test": "SELECTIVE_DELAY_MS=0 NETWORK_ID=50 FEE_RECIPIENT=0x78dc5d2d739606d31509c31d654056a45185ecb6 FEE_RECIPIENT_PRIVATE_KEY=752dd9cf65e68cfaba7d60225cbdbc1f4729dd5e5507def72815ed0d8abc6249 mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --exit",
         "update_snapshot": "cross-env download --extract --strip 1 --out 0x_ganache_snapshot ${npm_package_config_snapshot_url}",
         "reset_snapshot": "shx rm -rf 0x_ganache_snapshot; yarn update_snapshot"

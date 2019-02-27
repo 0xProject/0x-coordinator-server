@@ -24,7 +24,7 @@ import { utils } from './utils';
 
 export class Handlers {
     private readonly _provider: Provider;
-    private _broadcastCallback: BroadcastCallback;
+    private readonly _broadcastCallback: BroadcastCallback;
     private readonly _contractWrappers: ContractWrappers;
     private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): OrderWithoutExchangeAddress[] {
         switch (decodedCalldata.functionName) {

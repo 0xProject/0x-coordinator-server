@@ -499,4 +499,4 @@ function onMessage(client: WebSocket.w3cwebsocket, messageNumber: number): Array
     };
 
     return promises;
-}
+} // tslint:disable:max-file-line-count

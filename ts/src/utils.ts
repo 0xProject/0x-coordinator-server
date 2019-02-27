@@ -34,7 +34,7 @@ export const utils = {
         return feeRecipientAddress === FEE_RECIPIENT;
     },
     async sleepAsync(miliseconds: number): Promise<void> {
-        await new Promise(resolve => setTimeout(resolve, miliseconds));
+        await new Promise<void>(resolve => setTimeout(resolve, miliseconds));
     },
     getOrderWithoutExchangeAddress(signedOrder: SignedOrder): OrderWithoutExchangeAddress {
         const orderWithoutExchangeAddress = {
