@@ -10,6 +10,7 @@ export enum RequestTransactionErrors {
     InvalidFunctionCall = 'INVALID_FUNCTION_CALL',
     OrderCancelled = 'ORDER_CANCELLED',
     FillRequestAlreadyIssued = 'FILL_REQUEST_ALREADY_ISSUED',
+    FillRequestsExceededTakerAssetAmount = 'FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT',
 }
 
 export interface RequestTransactionResponse {

@@ -8,7 +8,14 @@ import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { EXPIRATION_DURATION_SECONDS, FEE_RECIPIENT, NETWORK_ID, SELECTIVE_DELAY_MS } from './config.js';
+import {
+    ENABLE_TX_SUBMISSION_DELEGATION,
+    EXPIRATION_DURATION_SECONDS,
+    FEE_RECIPIENT,
+    NETWORK_ID,
+    SELECTIVE_DELAY_MS,
+} from './config.js';
+import { TakerAssetFillAmountEntity } from './entities/taker_asset_fill_amount_entity.js';
 import { fillRequest } from './models/fill_request.js';
 import { signedOrder } from './models/signed_order';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
@@ -22,29 +29,80 @@ import {
 } from './types';
 import { utils } from './utils';
 
+enum ExchangeMethods {
+    FillOrder = 'fillOrder',
+    FillOrKillOrder = 'fillOrKillOrder',
+    FillOrderNoThrow = 'fillOrderNoThrow',
+    BatchFillOrders = 'batchFillOrders',
+    BatchFillOrKillOrders = 'batchFillOrKillOrders',
+    BatchFillOrdersNoThrow = 'batchFillOrdersNoThrow',
+    MarketSellOrders = 'marketSellOrders',
+    MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
+    MarketBuyOrders = 'marketBuyOrders',
+    MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
+    MatchOrders = 'matchOrders',
+
+    CancelOrder = 'cancelOrder',
+    BatchCancelOrders = 'batchCancelOrders',
+}
+
 export class Handlers {
     private readonly _provider: Provider;
     private readonly _broadcastCallback: BroadcastCallback;
     private readonly _contractWrappers: ContractWrappers;
+    private static _getTakerAssetFillAmountsFromDecodedCallData(decodedCalldata: DecodedCalldata): BigNumber[] {
+        let takerAssetFillAmounts = [];
+        switch (decodedCalldata.functionName) {
+            case ExchangeMethods.FillOrder:
+            case ExchangeMethods.FillOrKillOrder:
+            case ExchangeMethods.FillOrderNoThrow:
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow:
+                takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
+                break;
+
+            case ExchangeMethods.BatchFillOrders:
+            case ExchangeMethods.BatchFillOrKillOrders:
+            case ExchangeMethods.BatchFillOrdersNoThrow:
+                // takerAssetFillAmounts
+                takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
+                break;
+
+            case ExchangeMethods.MatchOrders:
+                // TODO!
+                // Must calculate amount that would fill of both orders.
+                return [new BigNumber(0), new BigNumber(0)];
+
+            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersNoThrow:
+                // TODO!
+                // makerAssetFillAmount
+                return [new BigNumber(0)];
+
+            default:
+                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
+        }
+        return takerAssetFillAmounts;
+    }
     private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): OrderWithoutExchangeAddress[] {
         switch (decodedCalldata.functionName) {
-            case 'fillOrder':
-            case 'fillOrKillOrder':
-            case 'fillOrderNoThrow':
-            case 'cancelOrder':
+            case ExchangeMethods.FillOrder:
+            case ExchangeMethods.FillOrKillOrder:
+            case ExchangeMethods.FillOrderNoThrow:
+            case ExchangeMethods.CancelOrder:
                 return [decodedCalldata.functionArguments.order];
 
-            case 'batchFillOrders':
-            case 'batchFillOrKillOrders':
-            case 'batchFillOrdersNoThrow':
-            case 'marketSellOrders':
-            case 'marketSellOrdersNoThrow':
-            case 'marketBuyOrders':
-            case 'marketBuyOrdersNoThrow':
-            case 'batchCancelOrders':
+            case ExchangeMethods.BatchFillOrders:
+            case ExchangeMethods.BatchFillOrKillOrders:
+            case ExchangeMethods.BatchFillOrdersNoThrow:
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow:
+            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersNoThrow:
+            case ExchangeMethods.BatchCancelOrders:
                 return decodedCalldata.functionArguments.orders;
 
-            case 'matchOrders':
+            case ExchangeMethods.MatchOrders:
                 const leftOrder = decodedCalldata.functionArguments.leftOrder;
                 const rightOrder = decodedCalldata.functionArguments.rightOrder;
                 return [leftOrder, rightOrder];
@@ -110,21 +168,23 @@ export class Handlers {
 
         // 5. Handle the request
         switch (decodedCalldata.functionName) {
-            case 'fillOrder':
-            case 'fillOrKillOrder':
-            case 'fillOrderNoThrow':
-            case 'batchFillOrders':
-            case 'batchFillOrKillOrders':
-            case 'batchFillOrdersNoThrow':
-            case 'marketSellOrders':
-            case 'marketSellOrdersNoThrow':
-            case 'marketBuyOrders':
-            case 'marketBuyOrdersNoThrow':
-            case 'matchOrders': {
+            case ExchangeMethods.FillOrder:
+            case ExchangeMethods.FillOrKillOrder:
+            case ExchangeMethods.FillOrderNoThrow:
+            case ExchangeMethods.BatchFillOrders:
+            case ExchangeMethods.BatchFillOrKillOrders:
+            case ExchangeMethods.BatchFillOrdersNoThrow:
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow:
+            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersNoThrow:
+            case ExchangeMethods.MatchOrders: {
+                const takerAssetFillAmounts = Handlers._getTakerAssetFillAmountsFromDecodedCallData(decodedCalldata);
                 const response = await this._handleFillsAsync(
                     decodedCalldata.functionName,
                     tecOrders,
                     signedTransaction,
+                    takerAssetFillAmounts,
                 );
                 res.status(response.status).send(response.body);
                 // After responding to taker's request, we broadcast the fill acceptance to all WS connections
@@ -143,8 +203,8 @@ export class Handlers {
                 return;
             }
 
-            case 'cancelOrder':
-            case `batchCancelOrders`: {
+            case ExchangeMethods.CancelOrder:
+            case ExchangeMethods.BatchCancelOrders: {
                 const response = await this._handleCancelsAsync(tecOrders, signedTransaction);
                 res.status(response.status).send(response.body);
                 return;
@@ -189,8 +249,37 @@ export class Handlers {
         functionName: string,
         tecOrders: OrderWithoutExchangeAddress[],
         signedTransaction: SignedZeroExTransaction,
+        takerAssetFillAmounts: BigNumber[],
     ): Promise<Response> {
-        for (const order of tecOrders) {
+        // Takers can only request to fill an order entirely once. If they do multiple
+        // partial fills, we keep track and make sure they have a sufficient partial fill
+        // amount left for this request to get approved.
+        const dbOrdersIfExists = await signedOrder.findMultipleAsync(tecOrders);
+        for (let i = 0; i < tecOrders.length; i++) {
+            const order = tecOrders[i];
+            const orderHash = signedOrder.getOrderHash(order);
+            const dbOrderIfExists = _.find(dbOrdersIfExists, o => o.orderHashHex === orderHash);
+            if (dbOrderIfExists !== undefined) {
+                const previouslyRequestedFillAmount = _.reduce(
+                    dbOrderIfExists.takerAssetFillAmounts,
+                    (sum: BigNumber, takerAssetFillAmountEntity: TakerAssetFillAmountEntity) => {
+                        if (takerAssetFillAmountEntity.takerAddress === signedTransaction.signerAddress) {
+                            return sum.plus(takerAssetFillAmountEntity.takerAssetFillAmount);
+                        }
+                        return sum;
+                    },
+                    new BigNumber(0),
+                );
+                const takerAssetFillAmount = takerAssetFillAmounts[i];
+                const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
+                if (totalRequestedFillAmount.gt(order.takerAssetAmount)) {
+                    return {
+                        status: HttpStatus.BAD_REQUEST,
+                        body: RequestTransactionErrors.FillRequestsExceededTakerAssetAmount,
+                    };
+                }
+            }
+
             // If cancelled, reject the request
             const isCancelled = await signedOrder.isCancelledAsync(order);
             if (isCancelled) {
@@ -211,7 +300,13 @@ export class Handlers {
         };
         this._broadcastCallback(fillRequestReceivedEvent);
         await utils.sleepAsync(SELECTIVE_DELAY_MS); // Add selective delay
-        const response = await this._generateAndStoreSignatureAsync(signedTransaction, tecOrders);
+        // TODO: Check if orders still not cancelled (might have been cancelled during the delay period)
+        // TODO 2: Add test for this edge-case, where order cancelled during selective delay
+        const response = await this._generateAndStoreSignatureAsync(
+            signedTransaction,
+            tecOrders,
+            takerAssetFillAmounts,
+        );
         return {
             status: HttpStatus.OK,
             body: response,
@@ -220,6 +315,7 @@ export class Handlers {
     private async _generateAndStoreSignatureAsync(
         signedTransaction: SignedZeroExTransaction,
         orders: OrderWithoutExchangeAddress[],
+        takerAssetFillAmounts: BigNumber[],
     ): Promise<RequestTransactionResponse> {
         // generate signature & expiry and add to DB
         const approvalExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + EXPIRATION_DURATION_SECONDS;
@@ -270,6 +366,7 @@ export class Handlers {
             approvalExpirationTimeSeconds,
             signedTransaction.signerAddress,
             orders,
+            takerAssetFillAmounts,
         );
 
         return {

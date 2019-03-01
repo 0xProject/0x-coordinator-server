@@ -1,9 +1,11 @@
 import { OrderWithoutExchangeAddress } from '@0x/types';
+import { BigNumber } from '@0x/utils';
 import * as _ from 'lodash';
 
 import { getDBConnection } from '../db_connection';
 import { FillRequestEntity } from '../entities/fill_request_entity';
 import { SignedOrderEntity } from '../entities/signed_order_entity';
+import { takerAssetFillAmount } from '../models/taker_asset_fill_amount';
 
 import { signedOrder } from './signed_order';
 
@@ -21,6 +23,7 @@ export const fillRequest = {
         expiration: number,
         takerAddress: string,
         orders: OrderWithoutExchangeAddress[],
+        takerAssetFillAmounts: BigNumber[],
     ): Promise<FillRequestEntity> {
         let fillRequestEntity = new FillRequestEntity();
         fillRequestEntity.signature = signature;
@@ -28,11 +31,14 @@ export const fillRequest = {
         fillRequestEntity.takerAddress = takerAddress;
 
         const signedOrderEntities: SignedOrderEntity[] = [];
-        for (const order of orders) {
+        for (let i = 0; i < orders.length; i++) {
+            const order = orders[i];
             let signedOrderEntityIfExists = await signedOrder.findAsync(order);
             if (signedOrderEntityIfExists === undefined) {
-                signedOrderEntityIfExists = await signedOrder.insertAsync(order);
+                signedOrderEntityIfExists = await signedOrder.createAsync(order);
             }
+            const fillAmount = takerAssetFillAmounts[i];
+            takerAssetFillAmount.createAsync(signedOrderEntityIfExists, takerAddress, fillAmount);
             signedOrderEntities.push(signedOrderEntityIfExists);
         }
 

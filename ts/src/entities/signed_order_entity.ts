@@ -1,10 +1,19 @@
-import { Column, Entity, PrimaryColumn } from 'typeorm';
+import { Column, Entity, OneToMany, PrimaryColumn } from 'typeorm';
+
+import { TakerAssetFillAmountEntity } from './taker_asset_fill_amount_entity';
 
 @Entity({ name: 'signed_order' })
 export class SignedOrderEntity {
-    @PrimaryColumn({ name: 'order_hash_hex' })
+    @PrimaryColumn()
     public orderHashHex!: string;
 
-    @Column({ name: 'is_cancelled' })
+    @Column()
     public isCancelled!: boolean;
+
+    @OneToMany(
+        _type => TakerAssetFillAmountEntity,
+        takerAssetFillAmountEntity => takerAssetFillAmountEntity.signedOrder,
+        { eager: true },
+    )
+    public takerAssetFillAmounts!: TakerAssetFillAmountEntity[];
 }

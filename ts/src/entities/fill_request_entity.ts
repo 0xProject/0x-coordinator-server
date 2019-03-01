@@ -11,12 +11,12 @@ export class FillRequestEntity {
     @JoinTable()
     public signedOrders!: SignedOrderEntity[];
 
-    @Column({ name: 'taker_address' })
+    @Column()
     public takerAddress!: string;
 
-    @Column({ name: 'signature' })
+    @Column()
     public signature!: string;
 
-    @Column({ name: 'expiration_time_seconds' })
+    @Column()
     public expirationTimeSeconds!: number;
 }

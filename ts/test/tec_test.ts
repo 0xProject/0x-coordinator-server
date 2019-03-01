@@ -6,10 +6,11 @@ import { BigNumber, fetchAsync } from '@0x/utils';
 import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
+import ChaiBigNumber = require('chai-bignumber');
 import * as dirtyChai from 'dirty-chai';
 import { Provider } from 'ethereum-types';
 import * as ethUtil from 'ethereumjs-util';
-import * as express from 'express';
+import * as http from 'http';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 import 'mocha';
@@ -17,7 +18,7 @@ import * as request from 'supertest';
 import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
-import { FEE_RECIPIENT } from '../src/config';
+import { FEE_RECIPIENT, NETWORK_ID } from '../src/config';
 import { FillRequestEntity } from '../src/entities/fill_request_entity';
 import { fillRequest } from '../src/models/fill_request';
 import { signedOrder } from '../src/models/signed_order';
@@ -28,16 +29,16 @@ import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
 import { TransactionFactory } from './transaction_factory';
 
 chai.config.includeStack = true;
+chai.use(ChaiBigNumber());
 chai.use(dirtyChai);
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 
-const NETWORK_ID = 50;
 const TESTRPC_PRIVATE_KEYS = _.map(TESTRPC_PRIVATE_KEYS_STRINGS, privateKeyString =>
     ethUtil.toBuffer(privateKeyString),
 );
 
-let app: express.Express;
+let app: http.Server;
 
 let owner: string;
 let senderAddress: string;
@@ -340,7 +341,43 @@ describe('TEC server', () => {
                 response.body.expiration,
             );
 
+            // Check that takerAssetFillAmount was added to DB
+            const signedOrderIfExists = await signedOrder.findAsync(order);
+            if (signedOrderIfExists === undefined) {
+                throw new Error(`Order was not stored in DB: ${JSON.stringify(order)}`);
+            }
+            expect(signedOrderIfExists.takerAssetFillAmounts.length).to.equal(1);
+            expect(signedOrderIfExists.takerAssetFillAmounts[0].takerAddress).to.equal(takerAddress);
+            expect(signedOrderIfExists.takerAssetFillAmounts[0].takerAssetFillAmount).to.be.bignumber.equal(
+                takerAssetFillAmount,
+            );
+
             // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
+        });
+        it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount; // Full amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
+            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
+            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const body = {
+                signedTransaction,
+            };
+            let response = await request(app)
+                .post('/v1/request_transaction')
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signature).to.not.be.undefined();
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+
+            response = await request(app)
+                .post('/v1/request_transaction')
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.text).to.be.equal(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
         });
         it('should return 200 OK if request to match two uncancelled orders', async () => {
             const leftOrder = await orderFactory.newSignedOrderAsync();
@@ -372,6 +409,8 @@ describe('TEC server', () => {
             expect((fillRequestEntityIfExists as FillRequestEntity).expirationTimeSeconds).to.be.equal(
                 response.body.expiration,
             );
+
+            // TODO(fabio): Add takerAssetFilled checks here
 
             // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
         });

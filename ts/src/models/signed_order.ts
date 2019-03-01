@@ -3,33 +3,47 @@ import { orderHashUtils } from '@0x/order-utils';
 import { OrderWithoutExchangeAddress } from '@0x/types';
 import * as _ from 'lodash';
 
+import { NETWORK_ID } from '../config.js';
 import { getDBConnection } from '../db_connection';
 import { SignedOrderEntity } from '../entities/signed_order_entity';
 
-import { NETWORK_ID } from '../config.js';
-
 export const signedOrder = {
-    async insertAsync(order: OrderWithoutExchangeAddress): Promise<SignedOrderEntity> {
+    async createAsync(order: OrderWithoutExchangeAddress): Promise<SignedOrderEntity> {
         let signedOrderEntity = new SignedOrderEntity();
-        const orderHash = signedOrder._getOrderHash(order);
+        const orderHash = signedOrder.getOrderHash(order);
         signedOrderEntity.orderHashHex = orderHash;
         signedOrderEntity.isCancelled = false;
+
         const connection = getDBConnection();
         signedOrderEntity = await connection.manager.save(SignedOrderEntity, signedOrderEntity);
         return signedOrderEntity;
     },
     async findAsync(order: OrderWithoutExchangeAddress): Promise<SignedOrderEntity | undefined> {
-        const orderHash = signedOrder._getOrderHash(order);
+        const orderHash = signedOrder.getOrderHash(order);
         const connection = getDBConnection();
         const signedOrderIfExists = await connection.manager.findOne(SignedOrderEntity, orderHash);
         return signedOrderIfExists;
+    },
+    async findMultipleAsync(orders: OrderWithoutExchangeAddress[]): Promise<SignedOrderEntity[]> {
+        const orderHashes = _.map(orders, order => signedOrder.getOrderHash(order));
+        const whereClauses = _.map(orderHashes, orderHash => {
+            return { orderHashHex: orderHash };
+        });
+        const connection = getDBConnection();
+        const signedOrdersIfExists = await connection.manager.find(SignedOrderEntity, {
+            where: whereClauses,
+        });
+        if (signedOrdersIfExists === undefined) {
+            return [];
+        }
+        return signedOrdersIfExists;
     },
     async isCancelledAsync(order: OrderWithoutExchangeAddress): Promise<boolean> {
         const signedOrderIfExists = await signedOrder.findAsync(order);
         return !_.isUndefined(signedOrderIfExists) && signedOrderIfExists.isCancelled;
     },
     async cancelAsync(order: OrderWithoutExchangeAddress): Promise<void> {
-        const orderHash = signedOrder._getOrderHash(order);
+        const orderHash = signedOrder.getOrderHash(order);
         const connection = getDBConnection();
         const signedOrderIfExists = await connection.manager.findOne(SignedOrderEntity, orderHash);
         let signedOrderEntity: SignedOrderEntity;
@@ -43,7 +57,7 @@ export const signedOrder = {
         }
         await connection.manager.save(SignedOrderEntity, signedOrderEntity);
     },
-    _getOrderHash(order: OrderWithoutExchangeAddress): string {
+    getOrderHash(order: OrderWithoutExchangeAddress): string {
         const contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
         const orderWithExchangeAddress = {
             ...order,
