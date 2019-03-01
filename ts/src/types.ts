@@ -1,5 +1,5 @@
 import { ZeroExTransaction } from '0x.js';
-import { OrderWithoutExchangeAddress } from '@0x/types';
+import { OrderWithoutExchangeAddress, SignedZeroExTransaction } from '@0x/types';
 
 export enum RequestTransactionErrors {
     InvalidBody = 'INVALID_BODY',
@@ -11,6 +11,12 @@ export enum RequestTransactionErrors {
     OrderCancelled = 'ORDER_CANCELLED',
     FillRequestAlreadyIssued = 'FILL_REQUEST_ALREADY_ISSUED',
     FillRequestsExceededTakerAssetAmount = 'FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT',
+    DelegatingTransactionSubmissionDisabled = 'DELEGATING_TRANSACTION_SUBMISSION_DISABLED',
+}
+
+export interface RequestTransactionBody {
+    signedTransaction: SignedZeroExTransaction;
+    delegateTransactionSubmission?: boolean;
 }
 
 export interface RequestTransactionResponse {

@@ -10,6 +10,7 @@ enum EnvVarType {
     FeeRecipientPrivateKey,
     UnitAmount,
     Url,
+    Boolean,
 }
 
 // Network port to listen on
@@ -56,6 +57,14 @@ export const EXPIRATION_DURATION_SECONDS = _.isEmpty(process.env.EXPIRATION_DURA
           EnvVarType.Integer,
       ) as number);
 
+export const ENABLE_TX_SUBMISSION_DELEGATION = _.isEmpty(process.env.ENABLE_TX_SUBMISSION_DELEGATION)
+    ? false
+    : assertEnvVarType(
+          'ENABLE_TX_SUBMISSION_DELEGATION',
+          process.env.ENABLE_TX_SUBMISSION_DELEGATION,
+          EnvVarType.Boolean,
+      );
+
 function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): any {
     let returnValue;
     switch (expectedType) {
@@ -78,6 +87,14 @@ function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): a
                 throw new Error(`${name} must be a valid integer, found ${value}.`);
             }
             return returnValue;
+
+        case EnvVarType.Boolean:
+            if (value === 'true') {
+                return true;
+            } else if (value === 'false') {
+                return false;
+            }
+            throw new Error(`Invalid boolean value for ${name} found: ${value}`);
 
         case EnvVarType.FeeRecipient:
             assert.isETHAddressHex(name, value);

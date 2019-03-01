@@ -122,6 +122,11 @@ export class Handlers {
         // 1. Validate request schema
         utils.validateSchema(req.body, requestTransactionSchema);
 
+        if (req.body.delegateTransactionSubmission && !ENABLE_TX_SUBMISSION_DELEGATION) {
+            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.DelegatingTransactionSubmissionDisabled);
+            return;
+        }
+
         // 2. Decode the supplied transaction data
         const signedTransaction: SignedZeroExTransaction = {
             ...req.body.signedTransaction,
