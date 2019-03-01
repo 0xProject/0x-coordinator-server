@@ -267,11 +267,8 @@ export class Handlers {
             const tecOrder = tecOrders[i];
             const orderHash = orderModel.getHash(tecOrder);
             const takerAssetFillAmount = takerAssetFillAmounts[i];
-            console.log('orderHashToFillAmount', orderHashToFillAmount);
             const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
             const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
-            console.log('previouslyRequestedFillAmount', previouslyRequestedFillAmount);
-            console.log('totalRequestedFillAmount', totalRequestedFillAmount);
             if (totalRequestedFillAmount.gt(tecOrder.takerAssetAmount)) {
                 return {
                     status: HttpStatus.BAD_REQUEST,
