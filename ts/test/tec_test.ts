@@ -19,10 +19,16 @@ import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
 import { FEE_RECIPIENT, NETWORK_ID } from '../src/config';
-import { FillRequestEntity } from '../src/entities/fill_request_entity';
-import { fillRequest } from '../src/models/fill_request';
-import { signedOrder } from '../src/models/signed_order';
-import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, RequestTransactionErrors } from '../src/types';
+import { TransactionEntity } from '../src/entities/transaction_entity';
+import { orderModel } from '../src/models/order_model';
+import { transactionModel } from '../src/models/transaction_model';
+import {
+    CancelRequestAccepted,
+    EventTypes,
+    FillRequestReceivedEvent,
+    RequestTransactionBody,
+    RequestTransactionErrors,
+} from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
@@ -218,9 +224,9 @@ describe('TEC server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
 
             // Check that only the TEC order got cancelled in DB
-            let isCancelled = await signedOrder.isCancelledAsync(tecOrder);
+            let isCancelled = await orderModel.isCancelledAsync(tecOrder);
             expect(isCancelled).to.be.true();
-            isCancelled = await signedOrder.isCancelledAsync(notTECOrder);
+            isCancelled = await orderModel.isCancelledAsync(notTECOrder);
             expect(isCancelled).to.be.false();
         });
         it('should return 200 OK & mark order as cancelled if successfully batch cancelling orders', async () => {
@@ -240,9 +246,9 @@ describe('TEC server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
 
             // Check that orders cancelled in DB
-            let isCancelled = await signedOrder.isCancelledAsync(orderOne);
+            let isCancelled = await orderModel.isCancelledAsync(orderOne);
             expect(isCancelled).to.be.true();
-            isCancelled = await signedOrder.isCancelledAsync(orderTwo);
+            isCancelled = await orderModel.isCancelledAsync(orderTwo);
             expect(isCancelled).to.be.true();
         });
         it('should return 400 if cancellation transaction not signed by order maker', async () => {
@@ -278,7 +284,7 @@ describe('TEC server', () => {
             expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
 
             // Verify that order wasn't cancelled
-            const isCancelled = await signedOrder.isCancelledAsync(order);
+            const isCancelled = await orderModel.isCancelledAsync(order);
             expect(isCancelled).to.be.false();
         });
         it('should return 200 OK & mark order as cancelled if successfully cancelling an order', async () => {
@@ -297,7 +303,7 @@ describe('TEC server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
 
             // Check that order cancelled in DB
-            const isCancelled = await signedOrder.isCancelledAsync(order);
+            const isCancelled = await orderModel.isCancelledAsync(order);
             expect(isCancelled).to.be.true();
 
             // Check that someone trying to fill the order, can't
@@ -335,22 +341,18 @@ describe('TEC server', () => {
             expect(response.body.expiration).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
-            const fillRequestEntityIfExists = await fillRequest.findAsync(takerAddress, response.body.signature);
-            expect(fillRequestEntityIfExists).to.not.be.undefined();
-            expect((fillRequestEntityIfExists as FillRequestEntity).expirationTimeSeconds).to.be.equal(
+            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
                 response.body.expiration,
             );
-
-            // Check that takerAssetFillAmount was added to DB
-            const signedOrderIfExists = await signedOrder.findAsync(order);
-            if (signedOrderIfExists === undefined) {
-                throw new Error(`Order was not stored in DB: ${JSON.stringify(order)}`);
-            }
-            expect(signedOrderIfExists.takerAssetFillAmounts.length).to.equal(1);
-            expect(signedOrderIfExists.takerAssetFillAmounts[0].takerAddress).to.equal(takerAddress);
-            expect(signedOrderIfExists.takerAssetFillAmounts[0].takerAssetFillAmount).to.be.bignumber.equal(
-                takerAssetFillAmount,
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(1);
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAddress).to.equal(
+                takerAddress,
             );
+            expect(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
+            ).to.be.bignumber.equal(takerAssetFillAmount);
 
             // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
         });
@@ -404,9 +406,9 @@ describe('TEC server', () => {
             expect(response.body.expiration).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
-            const fillRequestEntityIfExists = await fillRequest.findAsync(takerAddress, response.body.signature);
-            expect(fillRequestEntityIfExists).to.not.be.undefined();
-            expect((fillRequestEntityIfExists as FillRequestEntity).expirationTimeSeconds).to.be.equal(
+            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
                 response.body.expiration,
             );
 

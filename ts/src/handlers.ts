@@ -15,9 +15,8 @@ import {
     NETWORK_ID,
     SELECTIVE_DELAY_MS,
 } from './config.js';
-import { TakerAssetFillAmountEntity } from './entities/taker_asset_fill_amount_entity.js';
-import { fillRequest } from './models/fill_request.js';
-import { signedOrder } from './models/signed_order';
+import { orderModel } from './models/order_model';
+import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
 import {
     BroadcastCallback,
@@ -235,7 +234,7 @@ export class Handlers {
                     body: err.message,
                 };
             }
-            await signedOrder.cancelAsync(order);
+            await orderModel.cancelAsync(order);
         }
         const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
         const cancelRequestAccepted = {
@@ -259,34 +258,29 @@ export class Handlers {
         // Takers can only request to fill an order entirely once. If they do multiple
         // partial fills, we keep track and make sure they have a sufficient partial fill
         // amount left for this request to get approved.
-        const dbOrdersIfExists = await signedOrder.findMultipleAsync(tecOrders);
+        const takerAddress = signedTransaction.signerAddress; // Core assumption
+        const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
+            tecOrders,
+            takerAddress,
+        );
         for (let i = 0; i < tecOrders.length; i++) {
-            const order = tecOrders[i];
-            const orderHash = signedOrder.getOrderHash(order);
-            const dbOrderIfExists = _.find(dbOrdersIfExists, o => o.orderHashHex === orderHash);
-            if (dbOrderIfExists !== undefined) {
-                const previouslyRequestedFillAmount = _.reduce(
-                    dbOrderIfExists.takerAssetFillAmounts,
-                    (sum: BigNumber, takerAssetFillAmountEntity: TakerAssetFillAmountEntity) => {
-                        if (takerAssetFillAmountEntity.takerAddress === signedTransaction.signerAddress) {
-                            return sum.plus(takerAssetFillAmountEntity.takerAssetFillAmount);
-                        }
-                        return sum;
-                    },
-                    new BigNumber(0),
-                );
-                const takerAssetFillAmount = takerAssetFillAmounts[i];
-                const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
-                if (totalRequestedFillAmount.gt(order.takerAssetAmount)) {
-                    return {
-                        status: HttpStatus.BAD_REQUEST,
-                        body: RequestTransactionErrors.FillRequestsExceededTakerAssetAmount,
-                    };
-                }
+            const tecOrder = tecOrders[i];
+            const orderHash = orderModel.getHash(tecOrder);
+            const takerAssetFillAmount = takerAssetFillAmounts[i];
+            console.log('orderHashToFillAmount', orderHashToFillAmount);
+            const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
+            const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
+            console.log('previouslyRequestedFillAmount', previouslyRequestedFillAmount);
+            console.log('totalRequestedFillAmount', totalRequestedFillAmount);
+            if (totalRequestedFillAmount.gt(tecOrder.takerAssetAmount)) {
+                return {
+                    status: HttpStatus.BAD_REQUEST,
+                    body: RequestTransactionErrors.FillRequestsExceededTakerAssetAmount,
+                };
             }
 
             // If cancelled, reject the request
-            const isCancelled = await signedOrder.isCancelledAsync(order);
+            const isCancelled = await orderModel.isCancelledAsync(tecOrder);
             if (isCancelled) {
                 return {
                     status: HttpStatus.BAD_REQUEST,
@@ -366,7 +360,7 @@ export class Handlers {
         );
 
         // Insert signature into DB
-        await fillRequest.createAsync(
+        await transactionModel.createAsync(
             tecApprovalECSignature,
             approvalExpirationTimeSeconds,
             signedTransaction.signerAddress,

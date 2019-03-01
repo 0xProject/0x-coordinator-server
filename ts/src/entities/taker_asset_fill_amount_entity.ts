@@ -1,9 +1,8 @@
 import { BigNumber } from '@0x/utils';
 import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from 'typeorm';
 
+import { TransactionEntity } from '../entities/transaction_entity';
 import { bigNumberTransformer } from '../transformers/big_number';
-
-import { SignedOrderEntity } from './signed_order_entity';
 
 @Entity()
 export class TakerAssetFillAmountEntity {
@@ -16,6 +15,9 @@ export class TakerAssetFillAmountEntity {
     @Column({ type: 'numeric', transformer: bigNumberTransformer })
     public takerAssetFillAmount!: BigNumber;
 
-    @ManyToOne(_type => SignedOrderEntity, signedOrderEntity => signedOrderEntity.takerAssetFillAmounts)
-    public signedOrder!: SignedOrderEntity;
+    @Column()
+    public orderHash!: string;
+
+    @ManyToOne(_type => TransactionEntity, transaction => transaction.takerAssetFillAmounts)
+    public transaction!: TransactionEntity;
 }

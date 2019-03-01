@@ -36,9 +36,9 @@ export const utils = {
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise<void>(resolve => setTimeout(resolve, miliseconds));
     },
-    getOrderWithoutExchangeAddress(signedOrder: SignedOrder): OrderWithoutExchangeAddress {
+    getOrderWithoutExchangeAddress(order: SignedOrder): OrderWithoutExchangeAddress {
         const orderWithoutExchangeAddress = {
-            ...signedOrder,
+            ...order,
         };
         delete orderWithoutExchangeAddress.exchangeAddress;
         delete orderWithoutExchangeAddress.signature;

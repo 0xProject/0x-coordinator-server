@@ -1,4 +1,4 @@
-import { ZeroExTransaction } from '0x.js';
+import { BigNumber, ZeroExTransaction } from '0x.js';
 import { OrderWithoutExchangeAddress, SignedZeroExTransaction } from '@0x/types';
 
 export enum RequestTransactionErrors {
@@ -67,6 +67,10 @@ export interface CancelRequestAccepted {
         ordersWithoutExchangeAddress: OrderWithoutExchangeAddress[];
         zeroExTransaction: ZeroExTransaction;
     };
+}
+
+export interface OrderHashToFillAmount {
+    [orderHash: string]: BigNumber;
 }
 
 export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEvent | CancelRequestAccepted;
