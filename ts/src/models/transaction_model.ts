@@ -66,7 +66,6 @@ export const transactionModel = {
             const fillAmount = takerAssetFillAmounts[i];
             const takerAssetFillAmountEntity = await takerAssetFillAmountModel.createAsync(
                 orderEntityIfExists,
-                takerAddress,
                 fillAmount,
             );
             takerAssetFillAmountEntities.push(takerAssetFillAmountEntity);
@@ -80,7 +79,7 @@ export const transactionModel = {
     },
     async getOrderHashToFillAmountRequestedAsync(
         orders: OrderWithoutExchangeAddress[],
-        takerAddress: string,
+        takerAddress?: string,
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
         const transactions = await transactionModel.findByOrdersAsync(orders, takerAddress);

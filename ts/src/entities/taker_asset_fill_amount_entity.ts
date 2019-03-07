@@ -9,9 +9,6 @@ export class TakerAssetFillAmountEntity {
     @PrimaryGeneratedColumn()
     public id!: number;
 
-    @Column()
-    public takerAddress!: string;
-
     @Column({ type: 'numeric', transformer: bigNumberTransformer })
     public takerAssetFillAmount!: BigNumber;
 

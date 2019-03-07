@@ -24,21 +24,6 @@ export const orderModel = {
         const orderIfExists = await connection.manager.findOne(OrderEntity, orderHash);
         return orderIfExists;
     },
-    // TODO: Remove
-    async findMultipleAsync(orders: OrderWithoutExchangeAddress[]): Promise<OrderEntity[]> {
-        const orderHashes = _.map(orders, order => orderModel.getHash(order));
-        const whereClauses = _.map(orderHashes, orderHash => {
-            return { hash: orderHash };
-        });
-        const connection = getDBConnection();
-        const ordersIfExists = await connection.manager.find(OrderEntity, {
-            where: whereClauses,
-        });
-        if (ordersIfExists === undefined) {
-            return [];
-        }
-        return ordersIfExists;
-    },
     async isCancelledAsync(order: OrderWithoutExchangeAddress): Promise<boolean> {
         const orderIfExists = await orderModel.findAsync(order);
         return !_.isUndefined(orderIfExists) && orderIfExists.isCancelled;

@@ -22,13 +22,7 @@ import { FEE_RECIPIENT, NETWORK_ID } from '../src/config';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
 import { transactionModel } from '../src/models/transaction_model';
-import {
-    CancelRequestAccepted,
-    EventTypes,
-    FillRequestReceivedEvent,
-    RequestTransactionBody,
-    RequestTransactionErrors,
-} from '../src/types';
+import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, RequestTransactionErrors } from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
@@ -347,9 +341,6 @@ describe('TEC server', () => {
                 response.body.expiration,
             );
             expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(1);
-            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAddress).to.equal(
-                takerAddress,
-            );
             expect(
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmount);
@@ -416,6 +407,8 @@ describe('TEC server', () => {
 
             // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
         });
+        // TODO(fabio): Add test for when selectiveDelay != 0, and a cancel request comes in before end of delay
+        //              The request should be denied, and order cancelled.
     });
     describe(REQUESTS_PATH, () => {
         before(async () => {

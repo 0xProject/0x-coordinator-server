@@ -11,9 +11,6 @@
             },
             "required": ["verifyingContractAddress", "data", "salt", "signerAddress", "signature"],
             "type": "object"
-        },
-        "delegateTransactionSubmission": {
-            "type": "boolean"
         }
     },
     "required": ["signedTransaction"],

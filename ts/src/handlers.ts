@@ -8,13 +8,7 @@ import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import {
-    ENABLE_TX_SUBMISSION_DELEGATION,
-    EXPIRATION_DURATION_SECONDS,
-    FEE_RECIPIENT,
-    NETWORK_ID,
-    SELECTIVE_DELAY_MS,
-} from './config.js';
+import { EXPIRATION_DURATION_SECONDS, FEE_RECIPIENT, NETWORK_ID, SELECTIVE_DELAY_MS } from './config.js';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
@@ -120,11 +114,6 @@ export class Handlers {
     public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
         // 1. Validate request schema
         utils.validateSchema(req.body, requestTransactionSchema);
-
-        if (req.body.delegateTransactionSubmission && !ENABLE_TX_SUBMISSION_DELEGATION) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.DelegatingTransactionSubmissionDisabled);
-            return;
-        }
 
         // 2. Decode the supplied transaction data
         const signedTransaction: SignedZeroExTransaction = {
@@ -259,7 +248,7 @@ export class Handlers {
         // partial fills, we keep track and make sure they have a sufficient partial fill
         // amount left for this request to get approved.
         const takerAddress = signedTransaction.signerAddress; // Core assumption
-        const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
+        let orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
             tecOrders,
             takerAddress,
         );
@@ -285,6 +274,33 @@ export class Handlers {
                 };
             }
         }
+
+        // TODO(fabio:)
+        // Get all unexpired fillAmounts for each order (irrespective of taker)
+        // Get how much remains to be filled of each order [blockchain]
+        // Add both, and see if requested amount still fits. If yes, reserve and submit on chain
+        // Note: To reserve, we need to add the transaction to DB... but also need to have a way to make it
+        // "reserved"...
+        orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(tecOrders);
+
+        // TODO: Delegated fill
+        // - Check that no unexpired signatures outstanding
+        ////// await transactionModel.findByOrdersAsync(tecOrders);
+        // const hasUnexpiredSignatures = await transactionModel.hasUnexpiredSignaturesAsync(
+        //     tecOrders,
+        //     signedTransaction.signerAddress,
+        // );
+        // if (!hasUnexpiredSignatures) {
+        //     // Deletage the fill
+        //     return {
+        //         status: HttpStatus.OK,
+        //         body: 'TODO',
+        //     };
+        // }
+
+        // - if exist, do undelegated, otherwise send tx
+
+        // Undelegated fill
         const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
         const fillRequestReceivedEvent = {
             type: EventTypes.FillRequestReceived,
