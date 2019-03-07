@@ -4,7 +4,7 @@ import { OrderWithoutExchangeAddress } from '@0x/types';
 export enum RequestTransactionErrors {
     InvalidBody = 'INVALID_BODY',
     DecodingTransactionFailed = 'DECODING_TRANSACTION_FAILED',
-    TECFeeRecipientNotFound = 'TEC_FEE_RECIPIENT_NOT_FOUND',
+    CoordinatorFeeRecipientNotFound = 'COORDINATOR_FEE_RECIPIENT_NOT_FOUND',
     CancellationTransactionNotSignedByMaker = 'CANCELLATION_TRANSACTION_NOT_SIGNED_BY_MAKER',
     InvalidTransactionSignature = 'INVALID_TRANSACTION_SIGNATURE',
     InvalidFunctionCall = 'INVALID_FUNCTION_CALL',
@@ -19,7 +19,7 @@ export interface RequestTransactionResponse {
     expiration: number;
 }
 
-export interface TECApproval {
+export interface CoordinatorApproval {
     transactionHash: string;
     transactionSignature: string;
     approvalExpirationTimeSeconds: number;
@@ -51,8 +51,8 @@ export interface FillRequestAcceptedEvent {
         functionName: string;
         ordersWithoutExchangeAddress: OrderWithoutExchangeAddress[];
         zeroExTransaction: ZeroExTransaction;
-        tecSignature: string;
-        tecSignatureExpiration: number;
+        coordinatorSignature: string;
+        coordinatorSignatureExpiration: number;
     };
 }
 

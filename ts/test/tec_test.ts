@@ -44,7 +44,7 @@ let owner: string;
 let senderAddress: string;
 let makerAddress: string;
 let takerAddress: string;
-let tecSignerAddress: string;
+let coordinatorSignerAddress: string;
 let transactionFactory: TransactionFactory;
 let orderFactory: OrderFactory;
 let provider: Provider;
@@ -60,9 +60,9 @@ let wsClient: WebSocket.w3cwebsocket;
 
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x1e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0xbe0037eaf2d64fe5529bca93c18c9702d3930376';
-const NOT_TEC_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
+const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
 
-describe('TEC server', () => {
+describe('Coordinator server', () => {
     before(async () => {
         provider = web3Factory.getRpcProvider({
             shouldUseInProcessGanache: true,
@@ -75,9 +75,9 @@ describe('TEC server', () => {
 
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
-        [owner, senderAddress, makerAddress, takerAddress, tecSignerAddress] = _.slice(accounts, 0, 6);
+        [owner, senderAddress, makerAddress, takerAddress, coordinatorSignerAddress] = _.slice(accounts, 0, 6);
         owner = owner; // TODO(fabio): Remove later, once we use owner
-        tecSignerAddress = tecSignerAddress; // TODO(fabio): Remove later, once we use tecSignerAddress
+        coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
 
         contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
         const defaultOrderParams = {
@@ -149,9 +149,9 @@ describe('TEC server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.InvalidTransactionSignature);
         });
-        it('should return 400 INVALID_FEE_RECIPIENT if transaction sent with order without TECs feeRecipientAddress', async () => {
+        it('should return 400 INVALID_FEE_RECIPIENT if transaction sent with order without Coordinators feeRecipientAddress', async () => {
             const order = await orderFactory.newSignedOrderAsync({
-                feeRecipientAddress: NOT_TEC_FEE_RECIPIENT_ADDRESS,
+                feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
             });
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
@@ -166,7 +166,7 @@ describe('TEC server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.TECFeeRecipientNotFound);
+            expect(response.text).to.be.equal(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
         });
         it('should return 400 if transaction cannot be decoded', async () => {
             const invalidData =
@@ -199,13 +199,13 @@ describe('TEC server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
         });
-        it('should return 200 and only cancel TEC order if only one order sent in batch cancellation is a TEC order', async () => {
-            const tecOrder = await orderFactory.newSignedOrderAsync();
-            const notTECOrder = await orderFactory.newSignedOrderAsync({
-                feeRecipientAddress: NOT_TEC_FEE_RECIPIENT_ADDRESS,
+        it('should return 200 and only cancel Coordinator order if only one order sent in batch cancellation is a Coordinator order', async () => {
+            const coordinatorOrder = await orderFactory.newSignedOrderAsync();
+            const notCoordinatorOrder = await orderFactory.newSignedOrderAsync({
+                feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
             });
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
-            const data = transactionEncoder.batchCancelOrdersTx([tecOrder, notTECOrder]);
+            const data = transactionEncoder.batchCancelOrdersTx([coordinatorOrder, notCoordinatorOrder]);
             const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
             transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
             const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
@@ -217,10 +217,10 @@ describe('TEC server', () => {
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
 
-            // Check that only the TEC order got cancelled in DB
-            let isCancelled = await orderModel.isCancelledAsync(tecOrder);
+            // Check that only the Coordinator order got cancelled in DB
+            let isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
             expect(isCancelled).to.be.true();
-            isCancelled = await orderModel.isCancelledAsync(notTECOrder);
+            isCancelled = await orderModel.isCancelledAsync(notCoordinatorOrder);
             expect(isCancelled).to.be.false();
         });
         it('should return 200 OK & mark order as cancelled if successfully batch cancelling orders', async () => {
@@ -345,7 +345,7 @@ describe('TEC server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmount);
 
-            // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
+            // TODO(fabio): Check that the signature returned would be accepted by the Coordinator smart contract
         });
         it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -405,7 +405,7 @@ describe('TEC server', () => {
 
             // TODO(fabio): Add takerAssetFilled checks here
 
-            // TODO(fabio): Check that the signature returned would be accepted by the TEC smart contract
+            // TODO(fabio): Check that the signature returned would be accepted by the Coordinator smart contract
         });
         // TODO(fabio): Add test for when selectiveDelay != 0, and a cancel request comes in before end of delay
         //              The request should be denied, and order cancelled.
@@ -414,7 +414,7 @@ describe('TEC server', () => {
         before(async () => {
             app = await getAppAsync(provider);
             app.listen(TEST_PORT, () => {
-                utils.log(`TEC SERVER API (HTTP) listening on port ${TEST_PORT}`);
+                utils.log(`Coordinator SERVER API (HTTP) listening on port ${TEST_PORT}`);
             });
         });
         beforeEach(async () => {
@@ -467,8 +467,8 @@ describe('TEC server', () => {
             const FillRequestAcceptedEventMessage = await clientOnMessagePromises[1];
             const fillRequestAcceptedEvent = JSON.parse(FillRequestAcceptedEventMessage.data);
             expect(fillRequestAcceptedEvent.type).to.be.equal(EventTypes.FillRequestAccepted);
-            expect(fillRequestAcceptedEvent.data.tecSignature).to.not.be.undefined();
-            expect(fillRequestAcceptedEvent.data.tecSignatureExpiration).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.coordinatorSignature).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.coordinatorSignatureExpiration).to.not.be.undefined();
         });
         it('should emit WS event when valid cancel request accepted', async () => {
             // Register an onMessage handler to the WS client

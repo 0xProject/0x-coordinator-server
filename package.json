@@ -1,8 +1,8 @@
 {
-    "name": "0x-tec-server",
+    "name": "0x-coordinator-server",
     "version": "0.0.1",
-    "description": "0x TEC reference server implementation",
-    "repository": "git@github.com:0xProject/0x-tec-server.git",
+    "description": "0x Coordinator reference server implementation",
+    "repository": "git@github.com:0xProject/0x-coordinator-server.git",
     "license": "Apache-2.0",
     "scripts": {
         "build": "tsc -p ts/tsconfig.json",

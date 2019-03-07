@@ -15,7 +15,7 @@ const connectionStore: Set<WebSocket.connection> = new Set();
 
 /**
  * Creates a new express app/server
- * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing TEC approvals
+ * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing coordinator approvals
  */
 export async function getAppAsync(provider: Provider): Promise<http.Server> {
     if (!hasDBConnection()) {
@@ -42,7 +42,7 @@ export async function getAppAsync(provider: Provider): Promise<http.Server> {
     const wss = new WebSocket.server({
         httpServer: server,
         // Avoid setting autoAcceptConnections to true as it defeats all
-        // standard cross-origin protection facilities built into the protocol
+        // standard cross-origin procoordinatortion facilities built into the protocol
         // and the browser.
         // Source: https://www.npmjs.com/package/websocket#server-example
         // Also ensures that a request event is emitted by

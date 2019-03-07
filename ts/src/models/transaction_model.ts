@@ -79,7 +79,7 @@ export const transactionModel = {
     },
     async getOrderHashToFillAmountRequestedAsync(
         orders: OrderWithoutExchangeAddress[],
-        takerAddress?: string,
+        takerAddress: string,
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
         const transactions = await transactionModel.findByOrdersAsync(orders, takerAddress);

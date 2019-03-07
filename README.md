@@ -10,7 +10,7 @@
 
 ## Introduction
 
-A reference server implementation of the TEC (TCC-flavor).
+A reference server implementation of a soft-cancellation Coordinator.
 
 Fork this repository to get started!
 
@@ -21,7 +21,7 @@ Fork this repository to get started!
 -   [Node.js](https://nodejs.org/en/download/) > v8.x
 -   [Yarn](https://yarnpkg.com/en/) > v1.x
 
-To develop ontop of `0x-tec-server`, follow the following instructions:
+To develop ontop of `0x-coordinator-server`, follow the following instructions:
 
 1. Fork this repository
 
@@ -47,7 +47,7 @@ To develop ontop of `0x-tec-server`, follow the following instructions:
     yarn watch
     ```
 
-6. Start the TEC server
+6. Start the Coordinator server
 
     ```sh
     yarn start
@@ -67,10 +67,10 @@ This project uses [TypeORM](https://github.com/typeorm/typeorm). It makes it eas
 
 ## Deployment
 
-`0x-tec-server` ships as a docker container. First, install Docker ([mac](https://docs.docker.com/docker-for-mac/install/), [windows](https://docs.docker.com/docker-for-windows/install/)). To build the image run:
+`0x-coordinator-server` ships as a docker container. First, install Docker ([mac](https://docs.docker.com/docker-for-mac/install/), [windows](https://docs.docker.com/docker-for-windows/install/)). To build the image run:
 
 ```sh
-docker build -t 0x-tec-server .
+docker build -t 0x-coordinator-server .
 ```
 
 You can check that the image was built by running:
@@ -82,7 +82,7 @@ docker images
 And launch it with
 
 ```sh
-docker run -p 3000:3000 -d 0x-tec-server
+docker run -p 3000:3000 -d 0x-coordinator-server
 ```
 
 ## Legal Disclaimer

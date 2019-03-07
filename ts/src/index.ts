@@ -18,7 +18,11 @@ import { utils } from './utils';
 
     app.listen(config.HTTP_PORT, () => {
         utils.log(
-            `TEC SERVER API (HTTP) listening on port ${config.HTTP_PORT}!\nConfig: ${JSON.stringify(config, null, 2)}`,
+            `Coordinator SERVER API (HTTP) listening on port ${config.HTTP_PORT}!\nConfig: ${JSON.stringify(
+                config,
+                null,
+                2,
+            )}`,
         );
     });
 })().catch(utils.log);

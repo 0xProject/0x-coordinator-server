@@ -30,7 +30,7 @@ export const utils = {
         return Math.round(Date.now() / 1000);
     },
     // TODO(fabio): Allow operator to specify multiple feeRecipientAddresses
-    isTECFeeRecipient(feeRecipientAddress: string): boolean {
+    isCoordinatorFeeRecipient(feeRecipientAddress: string): boolean {
         return feeRecipientAddress === FEE_RECIPIENT;
     },
     async sleepAsync(miliseconds: number): Promise<void> {

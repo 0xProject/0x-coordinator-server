@@ -1,10 +1,10 @@
 // tslint:disable:max-classes-per-file
-export abstract class TECBaseError extends Error {
+export abstract class CoordinatorBaseError extends Error {
     public abstract statusCode: number;
-    public isTECError = true;
+    public isCoordinatorError = true;
 }
 
-export abstract class BadRequestError extends TECBaseError {
+export abstract class BadRequestError extends CoordinatorBaseError {
     public statusCode = 400;
     public abstract generalErrorCode: GeneralErrorCodes;
 }
@@ -28,20 +28,20 @@ export class MalformedJSONError extends BadRequestError {
     public generalErrorCode = GeneralErrorCodes.MalformedJson;
 }
 
-export class NotFoundError extends TECBaseError {
+export class NotFoundError extends CoordinatorBaseError {
     public statusCode = 404;
 }
 
-export class TooManyRequestsError extends TECBaseError {
+export class TooManyRequestsError extends CoordinatorBaseError {
     public statusCode = 429;
     public generalErrorCode = GeneralErrorCodes.Throttled;
 }
 
-export class InternalServerError extends TECBaseError {
+export class InternalServerError extends CoordinatorBaseError {
     public statusCode = 500;
 }
 
-export class NotImplementedError extends TECBaseError {
+export class NotImplementedError extends CoordinatorBaseError {
     public statusCode = 501;
 }
 
