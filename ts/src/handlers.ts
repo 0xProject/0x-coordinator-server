@@ -146,8 +146,6 @@ export class Handlers {
 
         // 4. Validate the 0x transaction signature
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
-        // TODO(fabio): Do we want to limit orders to using ECSignatures?
-        // Answer: YES. Refactor this. Without this, it's harder to know who the "taker" is...
         const isValidSignature = await signatureUtils.isValidSignatureAsync(
             this._provider,
             transactionHash,
@@ -247,7 +245,9 @@ export class Handlers {
         // Takers can only request to fill an order entirely once. If they do multiple
         // partial fills, we keep track and make sure they have a sufficient partial fill
         // amount left for this request to get approved.
-        const takerAddress = signedTransaction.signerAddress; // Core assumption
+
+        // Core assumption. If signature type is `Wallet`, then takerAddress = walletContractAddress.
+        const takerAddress = signedTransaction.signerAddress;
         const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
             coordinatorOrders,
             takerAddress,

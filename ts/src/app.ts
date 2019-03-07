@@ -61,7 +61,7 @@ export async function getAppAsync(provider: Provider): Promise<http.Server> {
         }
 
         // We do not do origin checks because we want to let anyone subscribe to this endpoint
-        // TODO: Implement additional credentialling here if wanted
+        // TODO: Implement additional credentialling here if desired
         const connection: WebSocket.connection = request.accept(null, request.origin);
 
         // Note: We don't handle the `message` event because this is a listen-only endpoint
