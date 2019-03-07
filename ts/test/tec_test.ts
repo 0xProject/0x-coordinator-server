@@ -372,41 +372,6 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
         });
-        it('should return 200 OK if request to match two uncancelled orders', async () => {
-            const leftOrder = await orderFactory.newSignedOrderAsync();
-            const rightOrder = await orderFactory.newSignedOrderAsync({
-                makerAddress: takerAddress,
-                takerAddress: makerAddress,
-                makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
-                takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
-            });
-            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
-            const data = transactionEncoder.matchOrdersTx(leftOrder, rightOrder);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
-            const body = {
-                signedTransaction,
-            };
-            const response = await request(app)
-                .post('/v1/request_transaction')
-                .send(body);
-            expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signature).to.not.be.undefined();
-            const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
-
-            // Check that fill request was added to DB
-            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
-            expect(transactionEntityIfExists).to.not.be.undefined();
-            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
-                response.body.expiration,
-            );
-
-            // TODO(fabio): Add takerAssetFilled checks here
-
-            // TODO(fabio): Check that the signature returned would be accepted by the Coordinator smart contract
-        });
         // TODO(fabio): Add test for when selectiveDelay != 0, and a cancel request comes in before end of delay
         //              The request should be denied, and order cancelled.
     });

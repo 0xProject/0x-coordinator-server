@@ -33,7 +33,6 @@ enum ExchangeMethods {
     MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
     MarketBuyOrders = 'marketBuyOrders',
     MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
-    MatchOrders = 'matchOrders',
 
     CancelOrder = 'cancelOrder',
     BatchCancelOrders = 'batchCancelOrders',
@@ -49,8 +48,6 @@ export class Handlers {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
             case ExchangeMethods.FillOrderNoThrow:
-            case ExchangeMethods.MarketSellOrders:
-            case ExchangeMethods.MarketSellOrdersNoThrow:
                 takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
                 break;
 
@@ -61,15 +58,16 @@ export class Handlers {
                 takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
                 break;
 
-            case ExchangeMethods.MatchOrders:
-                // TODO!
-                // Must calculate amount that would fill of both orders.
-                return [new BigNumber(0), new BigNumber(0)];
+            // TODO(fabio): Map takerFillAmounts to orders
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow:
+                // takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
+                break;
 
+            // TODO(fabio): Map makerFillAmount to orders
             case ExchangeMethods.MarketBuyOrders:
             case ExchangeMethods.MarketBuyOrdersNoThrow:
-                // TODO!
-                // makerAssetFillAmount
+                // TODO(fabio): Convert `makerAssetFillAmount` to `takerAssetFillAmount`
                 return [new BigNumber(0)];
 
             default:
@@ -94,11 +92,6 @@ export class Handlers {
             case ExchangeMethods.MarketBuyOrdersNoThrow:
             case ExchangeMethods.BatchCancelOrders:
                 return decodedCalldata.functionArguments.orders;
-
-            case ExchangeMethods.MatchOrders:
-                const leftOrder = decodedCalldata.functionArguments.leftOrder;
-                const rightOrder = decodedCalldata.functionArguments.rightOrder;
-                return [leftOrder, rightOrder];
 
             default:
                 throw new Error(RequestTransactionErrors.InvalidFunctionCall);
@@ -168,8 +161,7 @@ export class Handlers {
             case ExchangeMethods.MarketSellOrders:
             case ExchangeMethods.MarketSellOrdersNoThrow:
             case ExchangeMethods.MarketBuyOrders:
-            case ExchangeMethods.MarketBuyOrdersNoThrow:
-            case ExchangeMethods.MatchOrders: {
+            case ExchangeMethods.MarketBuyOrdersNoThrow: {
                 const takerAssetFillAmounts = Handlers._getTakerAssetFillAmountsFromDecodedCallData(decodedCalldata);
                 const response = await this._handleFillsAsync(
                     decodedCalldata.functionName,
