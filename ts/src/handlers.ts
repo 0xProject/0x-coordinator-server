@@ -71,7 +71,6 @@ export class Handlers {
         signedOrder: SignedOrder,
         orderAndTraderInfo: OrderAndTraderInfo,
     ): BigNumber {
-        console.log('orderAndTraderInfo', orderAndTraderInfo);
         const orderInfo = orderAndTraderInfo.orderInfo;
         const traderInfo = orderAndTraderInfo.traderInfo;
 
@@ -83,7 +82,6 @@ export class Handlers {
                 traderInfo.takerBalance,
                 traderInfo.takerAllowance,
             );
-            console.log('maxTakerAssetFillAmountGivenTakerConstraints', maxTakerAssetFillAmountGivenTakerConstraints);
             minSet.push(
                 maxTakerAssetFillAmountGivenTakerConstraints,
                 traderInfo.takerBalance,
@@ -93,8 +91,6 @@ export class Handlers {
 
         // Calculate min of balance & allowance of maker's makerAsset -> translate into takerAsset amount
         const maxMakerAssetFillAmount = BigNumber.min(traderInfo.makerBalance, traderInfo.makerAllowance);
-        console.log('maker traderInfo', traderInfo.makerBalance, traderInfo.makerAllowance);
-        console.log('maxMakerAssetFillAmount', maxMakerAssetFillAmount);
         const maxTakerAssetFillAmountGivenMakerConstraints = orderUtils.getTakerFillAmount(
             signedOrder,
             maxMakerAssetFillAmount,
@@ -104,7 +100,6 @@ export class Handlers {
         // Calculate min of balance & allowance of taker's ZRX -> translate into takerAsset amount
         if (!signedOrder.takerFee.eq(0)) {
             const takerZRXAvailable = BigNumber.min(traderInfo.takerZrxBalance, traderInfo.takerZrxAllowance);
-            console.log('takerZRXAvailable', takerZRXAvailable);
             const maxTakerAssetFillAmountGivenTakerZRXConstraints = takerZRXAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.takerFee)
@@ -115,7 +110,6 @@ export class Handlers {
         // Calculate min of balance & allowance of maker's ZRX -> translate into takerAsset amount
         if (!signedOrder.makerFee.eq(0)) {
             const makerZRXAvailable = BigNumber.min(traderInfo.makerZrxBalance, traderInfo.makerZrxAllowance);
-            console.log('makerZRXAvailable', makerZRXAvailable);
             const maxTakerAssetFillAmountGivenMakerZRXConstraints = makerZRXAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.makerFee)
@@ -124,7 +118,6 @@ export class Handlers {
         }
 
         const remainingTakerAssetFillAmount = signedOrder.takerAssetAmount.minus(orderInfo.orderTakerAssetFilledAmount);
-        console.log('remainingTakerAssetFillAmount', remainingTakerAssetFillAmount);
         minSet.push(remainingTakerAssetFillAmount);
 
         const maxTakerAssetFillAmount = BigNumber.min(...minSet);
@@ -329,7 +322,6 @@ export class Handlers {
             default:
                 throw new Error(RequestTransactionErrors.InvalidFunctionCall);
         }
-        console.log('takerAssetFillAmounts', takerAssetFillAmounts);
         return takerAssetFillAmounts;
     }
     private async _handleCancelsAsync(
