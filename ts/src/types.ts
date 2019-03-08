@@ -1,6 +1,16 @@
 import { BigNumber, ZeroExTransaction } from '0x.js';
 import { OrderWithoutExchangeAddress } from '@0x/types';
 
+export interface Configs {
+    HTTP_PORT: string;
+    NETWORK_ID: number;
+    RPC_URL: string;
+    FEE_RECIPIENT: string;
+    FEE_RECIPIENT_PRIVATE_KEY: string;
+    SELECTIVE_DELAY_MS: number;
+    EXPIRATION_DURATION_SECONDS: number;
+}
+
 export enum RequestTransactionErrors {
     InvalidBody = 'INVALID_BODY',
     DecodingTransactionFailed = 'DECODING_TRANSACTION_FAILED',

@@ -3,7 +3,7 @@ import { orderHashUtils } from '@0x/order-utils';
 import { OrderWithoutExchangeAddress } from '@0x/types';
 import * as _ from 'lodash';
 
-import { configs } from '../configs';
+import { getConfigs } from '../configs';
 import { getDBConnection } from '../db_connection';
 import { OrderEntity } from '../entities/order_entity';
 
@@ -44,7 +44,7 @@ export const orderModel = {
         await connection.manager.save(OrderEntity, orderEntity);
     },
     getHash(order: OrderWithoutExchangeAddress): string {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
+        const contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
         const orderWithExchangeAddress = {
             ...order,
             exchangeAddress: contractAddresses.exchange,

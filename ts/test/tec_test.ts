@@ -20,7 +20,7 @@ import * as request from 'supertest';
 import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
-import { configs } from '../src/configs';
+import { getConfigs, initConfigs, updateSelectiveDelay } from '../src/configs';
 import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
@@ -71,6 +71,8 @@ const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb
 
 describe('Coordinator server', () => {
     before(async () => {
+        initConfigs();
+
         provider = web3Factory.getRpcProvider({
             shouldUseInProcessGanache: true,
             ganacheDatabasePath: './0x_ganache_snapshot',
@@ -86,13 +88,13 @@ describe('Coordinator server', () => {
         owner = owner; // TODO(fabio): Remove later, once we use owner
         coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
 
-        contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
+        contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
         const defaultOrderParams = {
             ...constants.STATIC_ORDER_PARAMS,
             senderAddress,
             exchangeAddress: contractAddresses.exchange,
             makerAddress,
-            feeRecipientAddress: configs.FEE_RECIPIENT,
+            feeRecipientAddress: getConfigs().FEE_RECIPIENT,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
         };
@@ -100,7 +102,7 @@ describe('Coordinator server', () => {
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
 
         contractWrappers = new ContractWrappers(provider, {
-            networkId: configs.NETWORK_ID,
+            networkId: getConfigs().NETWORK_ID,
         });
 
         makerTokenContract = new DummyERC20TokenContract(
@@ -223,7 +225,7 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.InvalidTransactionSignature);
         });
-        it('should return 400 INVALID_configs. if transaction sent with order without Coordinators feeRecipientAddress', async () => {
+        it('should return 400 INVALID_FEE_RECIPIENT. if transaction sent with order without Coordinators feeRecipientAddress', async () => {
             const order = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
             });
