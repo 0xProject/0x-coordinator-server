@@ -550,7 +550,7 @@ describe('Coordinator server', () => {
         });
         // TODO(fabio): Add test for verifying that if two requests sitting on Selective Delay, the second
         // to complete takes into account the changes in fillAmounts requested from the first order.
-        it.only('should abort fill request if cancellation received during selective delay', done => {
+        it('should abort fill request if cancellation received during selective delay', done => {
             (async () => {
                 const selectiveDelayMs = getConfigs().SELECTIVE_DELAY_MS;
                 const selectiveDelayForThisTestMs = 1000;
@@ -599,8 +599,6 @@ describe('Coordinator server', () => {
                 updateSelectiveDelay(selectiveDelayMs); // Reset the selective delay at end of test
             })();
         });
-        // TODO(fabio): Add test for when selectiveDelay != 0, and a cancel request comes in before end of delay
-        //              The request should be denied, and order cancelled.
         // TODO(fabio): Add test filling an order with a Wallet contract.
     });
     describe(REQUESTS_PATH, () => {

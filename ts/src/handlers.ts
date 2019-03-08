@@ -399,11 +399,13 @@ export class Handlers {
                 takerAssetFillAmounts,
             );
         } catch (err) {
-            // TODO(fabio): Check that error is a RequestTransactionErrors error
-            return {
-                status: HttpStatus.BAD_REQUEST,
-                body: err.message,
-            };
+            if (_.includes(_.values(RequestTransactionErrors), err.message)) {
+                return {
+                    status: HttpStatus.BAD_REQUEST,
+                    body: err.message,
+                };
+            }
+            throw err;
         }
 
         const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
@@ -426,11 +428,13 @@ export class Handlers {
                 takerAssetFillAmounts,
             );
         } catch (err) {
-            // TODO(fabio): Check that error is a RequestTransactionErrors error
-            return {
-                status: HttpStatus.BAD_REQUEST,
-                body: err.message,
-            };
+            if (_.includes(_.values(RequestTransactionErrors), err.message)) {
+                return {
+                    status: HttpStatus.BAD_REQUEST,
+                    body: err.message,
+                };
+            }
+            throw err;
         }
 
         const response = await this._generateAndStoreSignatureAsync(
