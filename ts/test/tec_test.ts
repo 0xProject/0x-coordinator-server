@@ -548,6 +548,57 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
         });
+        // TODO(fabio): Add test for verifying that if two requests sitting on Selective Delay, the second
+        // to complete takes into account the changes in fillAmounts requested from the first order.
+        it.only('should abort fill request if cancellation received during selective delay', done => {
+            (async () => {
+                const selectiveDelayMs = getConfigs().SELECTIVE_DELAY_MS;
+                const selectiveDelayForThisTestMs = 1000;
+                updateSelectiveDelay(selectiveDelayForThisTestMs);
+
+                // Do fill request async
+                const order = await orderFactory.newSignedOrderAsync();
+                const takerAssetFillAmount = order.takerAssetAmount.div(2);
+                const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+                const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+                const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
+                transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
+                const signedFillTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+                const fillBody = {
+                    signedTransaction: signedFillTransaction,
+                };
+                // Don't block here, but continue
+                request(app)
+                    .post('/v1/request_transaction')
+                    .send(fillBody)
+                    .then((fillResponse: request.Response) => {
+                        expect(fillResponse.status).to.be.equal(HttpStatus.BAD_REQUEST);
+                        expect(fillResponse.text).to.be.equal(RequestTransactionErrors.OrderCancelled);
+                        done();
+                    });
+
+                // wait 100ms to guarentee that first request gets to awaiting the selective delay
+                await utils.sleepAsync(100);
+
+                // Do cancellation request
+                const cancelTxData = transactionEncoder.cancelOrderTx(order);
+                const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
+                transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
+                const signedCancelTransaction = transactionFactory.newSignedTransaction(
+                    cancelTxData,
+                    SignatureType.EthSign,
+                );
+                const cancelBody = {
+                    signedTransaction: signedCancelTransaction,
+                };
+                const response = await request(app)
+                    .post('/v1/request_transaction')
+                    .send(cancelBody);
+                expect(response.status).to.be.equal(HttpStatus.OK);
+
+                updateSelectiveDelay(selectiveDelayMs); // Reset the selective delay at end of test
+            })();
+        });
         // TODO(fabio): Add test for when selectiveDelay != 0, and a cancel request comes in before end of delay
         //              The request should be denied, and order cancelled.
         // TODO(fabio): Add test filling an order with a Wallet contract.

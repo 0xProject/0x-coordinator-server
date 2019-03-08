@@ -123,6 +123,38 @@ export class Handlers {
         const maxTakerAssetFillAmount = BigNumber.min(...minSet);
         return maxTakerAssetFillAmount;
     }
+    private static async _validateFillsAllowedOrThrowAsync(
+        signedTransaction: SignedZeroExTransaction,
+        coordinatorOrders: OrderWithoutExchangeAddress[],
+        takerAssetFillAmounts: BigNumber[],
+    ): Promise<void> {
+        // Takers can only request to fill an order entirely once. If they do multiple
+        // partial fills, we keep track and make sure they have a sufficient partial fill
+        // amount left for this request to get approved.
+
+        // Core assumption. If signature type is `Wallet`, then takerAddress = walletContractAddress.
+        const takerAddress = signedTransaction.signerAddress;
+        const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
+            coordinatorOrders,
+            takerAddress,
+        );
+        for (let i = 0; i < coordinatorOrders.length; i++) {
+            const coordinatorOrder = coordinatorOrders[i];
+            const orderHash = orderModel.getHash(coordinatorOrder);
+            const takerAssetFillAmount = takerAssetFillAmounts[i];
+            const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
+            const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
+            if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
+                throw new Error(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
+            }
+
+            // If cancelled, reject the request
+            const isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
+            if (isCancelled) {
+                throw new Error(RequestTransactionErrors.OrderCancelled);
+            }
+        }
+    }
     constructor(provider: Provider, broadcastCallback: BroadcastCallback) {
         this._provider = provider;
         this._broadcastCallback = broadcastCallback;
@@ -360,37 +392,18 @@ export class Handlers {
         signedTransaction: SignedZeroExTransaction,
         takerAssetFillAmounts: BigNumber[],
     ): Promise<Response> {
-        // Takers can only request to fill an order entirely once. If they do multiple
-        // partial fills, we keep track and make sure they have a sufficient partial fill
-        // amount left for this request to get approved.
-
-        // Core assumption. If signature type is `Wallet`, then takerAddress = walletContractAddress.
-        const takerAddress = signedTransaction.signerAddress;
-        const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
+        try {
+            await Handlers._validateFillsAllowedOrThrowAsync(
+                signedTransaction,
                 coordinatorOrders,
-            takerAddress,
+                takerAssetFillAmounts,
             );
-        for (let i = 0; i < coordinatorOrders.length; i++) {
-            const coordinatorOrder = coordinatorOrders[i];
-            const orderHash = orderModel.getHash(coordinatorOrder);
-            const takerAssetFillAmount = takerAssetFillAmounts[i];
-            const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
-            const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
-            if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
+        } catch (err) {
+            // TODO(fabio): Check that error is a RequestTransactionErrors error
             return {
                 status: HttpStatus.BAD_REQUEST,
-                    body: RequestTransactionErrors.FillRequestsExceededTakerAssetAmount,
-                };
-            }
-
-            // If cancelled, reject the request
-            const isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
-            if (isCancelled) {
-                return {
-                    status: HttpStatus.BAD_REQUEST,
-                    body: RequestTransactionErrors.OrderCancelled,
+                body: err.message,
             };
-        }
         }
 
         const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
@@ -403,9 +416,23 @@ export class Handlers {
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent);
-        await utils.sleepAsync(configs.SELECTIVE_DELAY_MS); // Add selective delay
-        // TODO: Check if orders still not cancelled (might have been cancelled during the delay period)
-        // TODO 2: Add test for this edge-case, where order cancelled during selective delay
+        await utils.sleepAsync(getConfigs().SELECTIVE_DELAY_MS); // Add selective delay
+
+        // Check that still a valid fill request after selective delay
+        try {
+            await Handlers._validateFillsAllowedOrThrowAsync(
+                signedTransaction,
+                coordinatorOrders,
+                takerAssetFillAmounts,
+            );
+        } catch (err) {
+            // TODO(fabio): Check that error is a RequestTransactionErrors error
+            return {
+                status: HttpStatus.BAD_REQUEST,
+                body: err.message,
+            };
+        }
+
         const response = await this._generateAndStoreSignatureAsync(
             signedTransaction,
             coordinatorOrders,
