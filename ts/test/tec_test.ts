@@ -20,7 +20,7 @@ import * as request from 'supertest';
 import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
-import { FEE_RECIPIENT, NETWORK_ID } from '../src/config';
+import { configs } from '../src/configs';
 import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
@@ -86,13 +86,13 @@ describe('Coordinator server', () => {
         owner = owner; // TODO(fabio): Remove later, once we use owner
         coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
 
-        contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
+        contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
         const defaultOrderParams = {
             ...constants.STATIC_ORDER_PARAMS,
             senderAddress,
             exchangeAddress: contractAddresses.exchange,
             makerAddress,
-            feeRecipientAddress: FEE_RECIPIENT,
+            feeRecipientAddress: configs.FEE_RECIPIENT,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
         };
@@ -100,7 +100,7 @@ describe('Coordinator server', () => {
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
 
         contractWrappers = new ContractWrappers(provider, {
-            networkId: NETWORK_ID,
+            networkId: configs.NETWORK_ID,
         });
 
         makerTokenContract = new DummyERC20TokenContract(
@@ -223,7 +223,7 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.InvalidTransactionSignature);
         });
-        it('should return 400 INVALID_FEE_RECIPIENT if transaction sent with order without Coordinators feeRecipientAddress', async () => {
+        it('should return 400 INVALID_configs. if transaction sent with order without Coordinators feeRecipientAddress', async () => {
             const order = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
             });

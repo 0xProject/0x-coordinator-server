@@ -3,7 +3,7 @@ import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, Zero
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
 
-import { FEE_RECIPIENT } from './config';
+import { configs } from './configs';
 import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
 
 const schemaValidator = new SchemaValidator();
@@ -31,7 +31,7 @@ export const utils = {
     },
     // TODO(fabio): Allow operator to specify multiple feeRecipientAddresses
     isCoordinatorFeeRecipient(feeRecipientAddress: string): boolean {
-        return feeRecipientAddress === FEE_RECIPIENT;
+        return feeRecipientAddress === configs.FEE_RECIPIENT;
     },
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise<void>(resolve => setTimeout(resolve, miliseconds));

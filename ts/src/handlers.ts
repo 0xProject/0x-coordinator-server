@@ -9,7 +9,7 @@ import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { EXPIRATION_DURATION_SECONDS, FEE_RECIPIENT, NETWORK_ID, SELECTIVE_DELAY_MS } from './config.js';
+import { configs } from './configs';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
@@ -134,7 +134,7 @@ export class Handlers {
         this._provider = provider;
         this._broadcastCallback = broadcastCallback;
         this._contractWrappers = new ContractWrappers(provider, {
-            networkId: NETWORK_ID,
+            networkId: configs.NETWORK_ID,
         });
     }
     public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
@@ -239,7 +239,7 @@ export class Handlers {
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
     ): Promise<BigNumber[]> {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
+        const contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
         let takerAssetFillAmounts: BigNumber[] = [];
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
@@ -411,7 +411,7 @@ export class Handlers {
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent);
-        await utils.sleepAsync(SELECTIVE_DELAY_MS); // Add selective delay
+        await utils.sleepAsync(configs.SELECTIVE_DELAY_MS); // Add selective delay
         // TODO: Check if orders still not cancelled (might have been cancelled during the delay period)
         // TODO 2: Add test for this edge-case, where order cancelled during selective delay
         const response = await this._generateAndStoreSignatureAsync(
@@ -430,7 +430,7 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
     ): Promise<RequestTransactionResponse> {
         // generate signature & expiry and add to DB
-        const approvalExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + EXPIRATION_DURATION_SECONDS;
+        const approvalExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS;
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const coordinatorApproval: CoordinatorApproval = {
             transactionHash,
@@ -450,7 +450,7 @@ export class Handlers {
         });
         // HACK(fabio): Hard-code fake Coordinator address until we've deployed the contract and added
         // the address to `@0x/contract-addresses`
-        const contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
+        const contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
         (contractAddresses as any).coordinator = '0xee0cec63753081f853145bc93a0f2988c9499925';
         const domain = {
             name: '0x Protocol Trade Execution Coordinator',
@@ -469,7 +469,7 @@ export class Handlers {
         const coordinatorApprovalECSignature = await signatureUtils.ecSignHashAsync(
             this._provider,
             coordinatorApprovalHashHex,
-            FEE_RECIPIENT,
+            configs.FEE_RECIPIENT,
         );
 
         // Insert signature into DB

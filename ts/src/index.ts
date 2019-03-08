@@ -3,23 +3,23 @@ import '@babel/polyfill';
 import 'reflect-metadata';
 
 import { getAppAsync } from './app';
-import * as config from './config';
+import { configs } from './configs';
 import { utils } from './utils';
 
 (async () => {
     const providerEngine = new Web3ProviderEngine();
-    const privateKeyWalletSubprovider = new PrivateKeyWalletSubprovider(config.FEE_RECIPIENT_PRIVATE_KEY);
+    const privateKeyWalletSubprovider = new PrivateKeyWalletSubprovider(configs.FEE_RECIPIENT_PRIVATE_KEY);
     providerEngine.addProvider(privateKeyWalletSubprovider);
-    const rpcSubprovider = new RPCSubprovider(config.RPC_URL);
+    const rpcSubprovider = new RPCSubprovider(configs.RPC_URL);
     providerEngine.addProvider(rpcSubprovider);
     providerEngine.start();
 
     const app = await getAppAsync(providerEngine);
 
-    app.listen(config.HTTP_PORT, () => {
+    app.listen(configs.HTTP_PORT, () => {
         utils.log(
-            `Coordinator SERVER API (HTTP) listening on port ${config.HTTP_PORT}!\nConfig: ${JSON.stringify(
-                config,
+            `Coordinator SERVER API (HTTP) listening on port ${configs.HTTP_PORT}!\nConfig: ${JSON.stringify(
+                configs,
                 null,
                 2,
             )}`,
