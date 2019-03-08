@@ -1,5 +1,7 @@
-import { assetDataUtils, ContractWrappers, SignatureType, ZeroExTransaction } from '0x.js';
+import { assetDataUtils, ContractWrappers, orderHashUtils, SignatureType, ZeroExTransaction } from '0x.js';
+import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
+import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
 import { BigNumber, fetchAsync } from '@0x/utils';
@@ -19,6 +21,7 @@ import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
 import { FEE_RECIPIENT, NETWORK_ID } from '../src/config';
+import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
 import { transactionModel } from '../src/models/transaction_model';
@@ -37,13 +40,17 @@ const expect = chai.expect;
 const TESTRPC_PRIVATE_KEYS = _.map(TESTRPC_PRIVATE_KEYS_STRINGS, privateKeyString =>
     ethUtil.toBuffer(privateKeyString),
 );
+const UNLIMITED_ALLOWANCE = new BigNumber(2).pow(256).minus(1);
 
 let app: http.Server;
 
+let web3Wrapper: Web3Wrapper;
 let owner: string;
 let senderAddress: string;
 let makerAddress: string;
 let takerAddress: string;
+let makerTokenContract: DummyERC20TokenContract;
+let takerTokenContract: DummyERC20TokenContract;
 let coordinatorSignerAddress: string;
 let transactionFactory: TransactionFactory;
 let orderFactory: OrderFactory;
@@ -58,8 +65,8 @@ const TEST_PORT = 8361;
 const REQUESTS_PATH = '/v1/requests';
 let wsClient: WebSocket.w3cwebsocket;
 
-const DEFAULT_MAKER_TOKEN_ADDRESS = '0x1e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d';
-const DEFAULT_TAKER_TOKEN_ADDRESS = '0xbe0037eaf2d64fe5529bca93c18c9702d3930376';
+const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
+const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
 
 describe('Coordinator server', () => {
@@ -69,7 +76,7 @@ describe('Coordinator server', () => {
             ganacheDatabasePath: './0x_ganache_snapshot',
         });
 
-        const web3Wrapper = new Web3Wrapper(provider);
+        web3Wrapper = new Web3Wrapper(provider);
         // TODO(fabio): Fix Web3Wrapper incompatability issues
         blockchainLifecycle = new BlockchainLifecycle(web3Wrapper as any);
 
@@ -95,12 +102,79 @@ describe('Coordinator server', () => {
         contractWrappers = new ContractWrappers(provider, {
             networkId: NETWORK_ID,
         });
+
+        makerTokenContract = new DummyERC20TokenContract(
+            tokensArtifacts.DummyERC20Token.compilerOutput.abi,
+            DEFAULT_MAKER_TOKEN_ADDRESS,
+            provider,
+        );
+        takerTokenContract = new DummyERC20TokenContract(
+            tokensArtifacts.DummyERC20Token.compilerOutput.abi,
+            DEFAULT_TAKER_TOKEN_ADDRESS,
+            provider,
+        );
     });
     after(async () => {
         await blockchainLifecycle.revertAsync();
     });
     beforeEach(async () => {
         await blockchainLifecycle.startAsync();
+
+        const makerBalance = constants.STATIC_ORDER_PARAMS.makerAssetAmount.times(5);
+        const makerAllowance = UNLIMITED_ALLOWANCE;
+        const takerBalance = constants.STATIC_ORDER_PARAMS.takerAssetAmount.times(5);
+        const takerAllowance = UNLIMITED_ALLOWANCE;
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await makerTokenContract.setBalance.sendTransactionAsync(makerAddress, makerBalance, {
+                from: owner,
+            }),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await makerTokenContract.approve.sendTransactionAsync(contractAddresses.erc20Proxy, makerAllowance, {
+                from: makerAddress,
+            }),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await contractWrappers.erc20Token.transferAsync(
+                contractAddresses.zrxToken,
+                owner,
+                makerAddress,
+                makerBalance,
+            ),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await contractWrappers.erc20Token.setUnlimitedProxyAllowanceAsync(contractAddresses.zrxToken, makerAddress),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await takerTokenContract.setBalance.sendTransactionAsync(takerAddress, takerBalance, {
+                from: owner,
+            }),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await takerTokenContract.approve.sendTransactionAsync(contractAddresses.erc20Proxy, takerAllowance, {
+                from: takerAddress,
+            }),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await contractWrappers.erc20Token.transferAsync(
+                contractAddresses.zrxToken,
+                owner,
+                takerAddress,
+                takerBalance,
+            ),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
+        await web3Wrapper.awaitTransactionSuccessAsync(
+            await contractWrappers.erc20Token.setUnlimitedProxyAllowanceAsync(contractAddresses.zrxToken, takerAddress),
+            constants.AWAIT_TRANSACTION_MINED_MS,
+        );
     });
     afterEach(async () => {
         await blockchainLifecycle.revertAsync();
@@ -347,6 +421,106 @@ describe('Coordinator server', () => {
 
             // TODO(fabio): Check that the signature returned would be accepted by the Coordinator smart contract
         });
+        it('should return 200 OK if request to marketSell uncancelled orders', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync();
+            const orderTwo = await orderFactory.newSignedOrderAsync();
+            // 1.5X the total fillAmount of the two orders
+            const orderOneTakerAssetFillAmount = orderOne.takerAssetAmount;
+            const orderTwoTakerAssetFillAmount = orderTwo.takerAssetAmount.div(2);
+            const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.marketSellOrdersTx([orderOne, orderTwo], takerAssetFillAmount);
+            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
+            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
+            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const body = {
+                signedTransaction,
+            };
+            const response = await request(app)
+                .post('/v1/request_transaction')
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signature).to.not.be.undefined();
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+
+            // Check that fill request was added to DB
+            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
+                response.body.expiration,
+            );
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
+
+            // Check that the correct takerAssetFillAmounts were calculated and stored
+            const orderHashOne = orderHashUtils.getOrderHashHex(orderOne);
+            const takerAssetFillAmountOne = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashOne,
+            ) as TakerAssetFillAmountEntity;
+            expect(takerAssetFillAmountOne.takerAssetFillAmount).to.be.bignumber.equal(orderOneTakerAssetFillAmount);
+
+            const orderHashTwo = orderHashUtils.getOrderHashHex(orderTwo);
+            const takerAssetFillAmountTwo = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashTwo,
+            ) as TakerAssetFillAmountEntity;
+            expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
+        });
+        it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync();
+            const orderTwo = await orderFactory.newSignedOrderAsync();
+            // 1.5X the total fillAmount of the two orders
+            const orderOneMakerAssetFillAmount = orderOne.makerAssetAmount;
+            const orderTwoMakerAssetFillAmount = orderTwo.makerAssetAmount.div(2);
+            const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.marketBuyOrdersTx([orderOne, orderTwo], makerAssetFillAmount);
+            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
+            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
+            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const body = {
+                signedTransaction,
+            };
+            const response = await request(app)
+                .post('/v1/request_transaction')
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signature).to.not.be.undefined();
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+
+            // Check that fill request was added to DB
+            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
+                response.body.expiration,
+            );
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
+
+            // Check that the correct takerAssetFillAmounts were calculated and stored
+            const orderHashOne = orderHashUtils.getOrderHashHex(orderOne);
+            const takerAssetFillAmountOne = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashOne,
+            ) as TakerAssetFillAmountEntity;
+            const expectedOrderOneMakerAssetFillAmount = orderUtils.getMakerFillAmount(
+                orderOne,
+                takerAssetFillAmountOne.takerAssetFillAmount,
+            );
+            expect(expectedOrderOneMakerAssetFillAmount).to.be.bignumber.equal(orderOneMakerAssetFillAmount);
+
+            const orderHashTwo = orderHashUtils.getOrderHashHex(orderTwo);
+            const takerAssetFillAmountTwo = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashTwo,
+            ) as TakerAssetFillAmountEntity;
+            const expectedOrderTwoMakerAssetFillAmount = orderUtils.getMakerFillAmount(
+                orderOne,
+                takerAssetFillAmountTwo.takerAssetFillAmount,
+            );
+            expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
+        });
         it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount; // Full amount
@@ -374,6 +548,7 @@ describe('Coordinator server', () => {
         });
         // TODO(fabio): Add test for when selectiveDelay != 0, and a cancel request comes in before end of delay
         //              The request should be denied, and order cancelled.
+        // TODO(fabio): Add test filling an order with a Wallet contract.
     });
     describe(REQUESTS_PATH, () => {
         before(async () => {

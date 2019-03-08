@@ -1,7 +1,8 @@
-import { ContractWrappers, DecodedCalldata, signatureUtils, transactionHashUtils } from '0x.js';
+import { ContractWrappers, DecodedCalldata, OrderAndTraderInfo, signatureUtils, transactionHashUtils } from '0x.js';
+import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { eip712Utils } from '@0x/order-utils';
-import { OrderWithoutExchangeAddress, SignedZeroExTransaction } from '@0x/types';
+import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, signTypedDataUtils } from '@0x/utils';
 import { Provider } from 'ethereum-types';
 import * as express from 'express';
@@ -21,6 +22,8 @@ import {
     Response,
 } from './types';
 import { utils } from './utils';
+
+const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 enum ExchangeMethods {
     FillOrder = 'fillOrder',
@@ -42,39 +45,6 @@ export class Handlers {
     private readonly _provider: Provider;
     private readonly _broadcastCallback: BroadcastCallback;
     private readonly _contractWrappers: ContractWrappers;
-    private static _getTakerAssetFillAmountsFromDecodedCallData(decodedCalldata: DecodedCalldata): BigNumber[] {
-        let takerAssetFillAmounts = [];
-        switch (decodedCalldata.functionName) {
-            case ExchangeMethods.FillOrder:
-            case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
-                takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
-                break;
-
-            case ExchangeMethods.BatchFillOrders:
-            case ExchangeMethods.BatchFillOrKillOrders:
-            case ExchangeMethods.BatchFillOrdersNoThrow:
-                // takerAssetFillAmounts
-                takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
-                break;
-
-            // TODO(fabio): Map takerFillAmounts to orders
-            case ExchangeMethods.MarketSellOrders:
-            case ExchangeMethods.MarketSellOrdersNoThrow:
-                // takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
-                break;
-
-            // TODO(fabio): Map makerFillAmount to orders
-            case ExchangeMethods.MarketBuyOrders:
-            case ExchangeMethods.MarketBuyOrdersNoThrow:
-                // TODO(fabio): Convert `makerAssetFillAmount` to `takerAssetFillAmount`
-                return [new BigNumber(0)];
-
-            default:
-                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
-        }
-        return takerAssetFillAmounts;
-    }
     private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): OrderWithoutExchangeAddress[] {
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
@@ -96,6 +66,69 @@ export class Handlers {
             default:
                 throw new Error(RequestTransactionErrors.InvalidFunctionCall);
         }
+    }
+    private static _calculateRemainingFillableTakerAssetAmount(
+        signedOrder: SignedOrder,
+        orderAndTraderInfo: OrderAndTraderInfo,
+    ): BigNumber {
+        console.log('orderAndTraderInfo', orderAndTraderInfo);
+        const orderInfo = orderAndTraderInfo.orderInfo;
+        const traderInfo = orderAndTraderInfo.traderInfo;
+
+        const minSet = [];
+
+        // Calculate min of balance & allowance of taker's takerAsset
+        if (signedOrder.takerAddress !== NULL_ADDRESS) {
+            const maxTakerAssetFillAmountGivenTakerConstraints = BigNumber.min(
+                traderInfo.takerBalance,
+                traderInfo.takerAllowance,
+            );
+            console.log('maxTakerAssetFillAmountGivenTakerConstraints', maxTakerAssetFillAmountGivenTakerConstraints);
+            minSet.push(
+                maxTakerAssetFillAmountGivenTakerConstraints,
+                traderInfo.takerBalance,
+                traderInfo.takerAllowance,
+            );
+        }
+
+        // Calculate min of balance & allowance of maker's makerAsset -> translate into takerAsset amount
+        const maxMakerAssetFillAmount = BigNumber.min(traderInfo.makerBalance, traderInfo.makerAllowance);
+        console.log('maker traderInfo', traderInfo.makerBalance, traderInfo.makerAllowance);
+        console.log('maxMakerAssetFillAmount', maxMakerAssetFillAmount);
+        const maxTakerAssetFillAmountGivenMakerConstraints = orderUtils.getTakerFillAmount(
+            signedOrder,
+            maxMakerAssetFillAmount,
+        );
+        minSet.push(maxTakerAssetFillAmountGivenMakerConstraints);
+
+        // Calculate min of balance & allowance of taker's ZRX -> translate into takerAsset amount
+        if (!signedOrder.takerFee.eq(0)) {
+            const takerZRXAvailable = BigNumber.min(traderInfo.takerZrxBalance, traderInfo.takerZrxAllowance);
+            console.log('takerZRXAvailable', takerZRXAvailable);
+            const maxTakerAssetFillAmountGivenTakerZRXConstraints = takerZRXAvailable
+                .multipliedBy(signedOrder.takerAssetAmount)
+                .div(signedOrder.takerFee)
+                .integerValue(BigNumber.ROUND_CEIL); // Should this round to ciel or floor?
+            minSet.push(maxTakerAssetFillAmountGivenTakerZRXConstraints);
+        }
+
+        // Calculate min of balance & allowance of maker's ZRX -> translate into takerAsset amount
+        if (!signedOrder.makerFee.eq(0)) {
+            const makerZRXAvailable = BigNumber.min(traderInfo.makerZrxBalance, traderInfo.makerZrxAllowance);
+            console.log('makerZRXAvailable', makerZRXAvailable);
+            const maxTakerAssetFillAmountGivenMakerZRXConstraints = makerZRXAvailable
+                .multipliedBy(signedOrder.takerAssetAmount)
+                .div(signedOrder.makerFee)
+                .integerValue(BigNumber.ROUND_CEIL); // Should this round to ciel or floor?
+            minSet.push(maxTakerAssetFillAmountGivenMakerZRXConstraints);
+        }
+
+        const remainingTakerAssetFillAmount = signedOrder.takerAssetAmount.minus(orderInfo.orderTakerAssetFilledAmount);
+        console.log('remainingTakerAssetFillAmount', remainingTakerAssetFillAmount);
+        minSet.push(remainingTakerAssetFillAmount);
+
+        const maxTakerAssetFillAmount = BigNumber.min(...minSet);
+        return maxTakerAssetFillAmount;
     }
     constructor(provider: Provider, broadcastCallback: BroadcastCallback) {
         this._provider = provider;
@@ -162,7 +195,11 @@ export class Handlers {
             case ExchangeMethods.MarketSellOrdersNoThrow:
             case ExchangeMethods.MarketBuyOrders:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
-                const takerAssetFillAmounts = Handlers._getTakerAssetFillAmountsFromDecodedCallData(decodedCalldata);
+                const takerAddress = signedTransaction.signerAddress;
+                const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCallDataAsync(
+                    decodedCalldata,
+                    takerAddress,
+                );
                 const response = await this._handleFillsAsync(
                     decodedCalldata.functionName,
                     coordinatorOrders,
@@ -197,6 +234,103 @@ export class Handlers {
                 res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidFunctionCall);
                 return;
         }
+    }
+    private async _getTakerAssetFillAmountsFromDecodedCallDataAsync(
+        decodedCalldata: DecodedCalldata,
+        takerAddress: string,
+    ): Promise<BigNumber[]> {
+        const contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
+        let takerAssetFillAmounts: BigNumber[] = [];
+        switch (decodedCalldata.functionName) {
+            case ExchangeMethods.FillOrder:
+            case ExchangeMethods.FillOrKillOrder:
+            case ExchangeMethods.FillOrderNoThrow:
+                takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
+                break;
+
+            case ExchangeMethods.BatchFillOrders:
+            case ExchangeMethods.BatchFillOrKillOrders:
+            case ExchangeMethods.BatchFillOrdersNoThrow:
+                // takerAssetFillAmounts
+                takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
+                break;
+
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow: {
+                const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
+                    decodedCalldata.functionArguments.orders,
+                    decodedCalldata.functionArguments.signatures,
+                    contractAddresses.exchange,
+                );
+                const takerAddresses: string[] = [];
+                _.times(signedOrders.length, () => {
+                    takerAddresses.push(takerAddress);
+                });
+                const orderAndTraderInfos = await this._contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
+                    signedOrders,
+                    takerAddresses,
+                );
+                let totalTakerAssetAmount: BigNumber = decodedCalldata.functionArguments.takerAssetFillAmount;
+                _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
+                    const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
+                        signedOrders[i],
+                        orderAndTraderInfo,
+                    );
+                    const takerAssetFillAmount = totalTakerAssetAmount.isLessThan(remainingFillableTakerAssetAmount)
+                        ? totalTakerAssetAmount
+                        : remainingFillableTakerAssetAmount;
+                    totalTakerAssetAmount = totalTakerAssetAmount.minus(takerAssetFillAmount);
+                    takerAssetFillAmounts.push(takerAssetFillAmount);
+                });
+                break;
+            }
+
+            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersNoThrow: {
+                const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
+                    decodedCalldata.functionArguments.orders,
+                    decodedCalldata.functionArguments.signatures,
+                    contractAddresses.exchange,
+                );
+                const takerAddresses: string[] = [];
+                _.times(signedOrders.length, () => {
+                    takerAddresses.push(takerAddress);
+                });
+                const orderAndTraderInfos = await this._contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
+                    signedOrders,
+                    takerAddresses,
+                );
+                let totalMakerAssetAmount: BigNumber = decodedCalldata.functionArguments.makerAssetFillAmount;
+                _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
+                    const signedOrder = signedOrders[i];
+                    const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
+                        signedOrder,
+                        orderAndTraderInfo,
+                    );
+                    const totalTakerAssetAmountAtOrderExchangeRate = orderUtils.getTakerFillAmount(
+                        signedOrder,
+                        totalMakerAssetAmount,
+                    );
+                    const takerAssetFillAmount = totalTakerAssetAmountAtOrderExchangeRate.isLessThan(
+                        remainingFillableTakerAssetAmount,
+                    )
+                        ? totalTakerAssetAmountAtOrderExchangeRate
+                        : remainingFillableTakerAssetAmount;
+
+                    const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(
+                        takerAssetFillAmount,
+                    );
+                    totalMakerAssetAmount = orderUtils.getMakerFillAmount(signedOrder, remainingTotalTakerAssetAmount);
+                    takerAssetFillAmounts.push(takerAssetFillAmount);
+                });
+                break;
+            }
+
+            default:
+                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
+        }
+        console.log('takerAssetFillAmounts', takerAssetFillAmounts);
+        return takerAssetFillAmounts;
     }
     private async _handleCancelsAsync(
         coordinatorOrders: OrderWithoutExchangeAddress[],

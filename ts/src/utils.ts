@@ -44,6 +44,18 @@ export const utils = {
         delete orderWithoutExchangeAddress.signature;
         return orderWithoutExchangeAddress;
     },
+    getSignedOrdersFromOrderWithoutExchangeAddresses(
+        orders: OrderWithoutExchangeAddress[],
+        signatures: string[],
+        exchangeAddress: string,
+    ): SignedOrder[] {
+        const signedOrders: SignedOrder[] = _.map(orders, (o: any, i: number) => {
+            o.signature = signatures[i];
+            o.exchangeAddress = exchangeAddress;
+            return o;
+        });
+        return signedOrders;
+    },
     getUnsignedTransaction(signedTransaction: SignedZeroExTransaction): ZeroExTransaction {
         const unsignedTransaction = _.clone(signedTransaction);
         delete unsignedTransaction.signature;
