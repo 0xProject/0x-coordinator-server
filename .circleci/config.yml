@@ -25,6 +25,10 @@ jobs:
                   paths:
                       - node_modules
                   key: v1-dependencies-{{ checksum "yarn.lock" }}
-            - run: yarn build
             - run: yarn lint
             - run: yarn prettier
+            - run: yarn build
+            - run:
+                  name: Ganache Snapshot download
+                  command: yarn download_snapshot
+            - run: yarn test
