@@ -241,7 +241,7 @@ export class Handlers {
                         ordersWithoutExchangeAddress: coordinatorOrders,
                         zeroExTransaction: unsignedTransaction,
                         coordinatorSignature: response.body.signature,
-                        coordinatorSignatureExpiration: response.body.expiration,
+                        coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
                     },
                 };
                 this._broadcastCallback(fillRequestAcceptedEvent);
@@ -509,7 +509,7 @@ export class Handlers {
 
         return {
             signature: coordinatorApprovalECSignature,
-            expiration: approvalExpirationTimeSeconds,
+            expirationTimeSeconds: approvalExpirationTimeSeconds,
         };
     }
 }

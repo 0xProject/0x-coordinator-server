@@ -22,7 +22,10 @@ export const transactionModel = {
     },
     async findByOrdersAsync(
         orders: OrderWithoutExchangeAddress[],
-        takerAddress?: string,
+        opts?: {
+            takerAddress?: string;
+            isUnexpired?: boolean;
+        },
     ): Promise<TransactionEntity[]> {
         const connection = getDBConnection();
         const orderHashes = _.map(orders, order => orderModel.getHash(order));
@@ -32,8 +35,14 @@ export const transactionModel = {
             .leftJoinAndSelect('transaction.orders', 'order')
             .leftJoinAndSelect('transaction.takerAssetFillAmounts', 'takerAssetFillAmount')
             .where('order.hash IN (:...orderHashes)', { orderHashes });
-        if (takerAddress !== undefined) {
-            query = query.where('transaction.takerAddress = :takerAddress', { takerAddress });
+        if (opts !== undefined && opts.takerAddress !== undefined) {
+            query = query.andWhere('transaction.takerAddress = :takerAddress', { takerAddress: opts.takerAddress });
+        }
+        if (opts !== undefined && opts.isUnexpired) {
+            const currentExpiration = Math.round(Date.now() / 1000);
+            query = query.andWhere('transaction.expirationTimeSeconds > :currentExpiration', {
+                currentExpiration,
+            });
         }
 
         const transactionsIfExists = await query.getMany();
@@ -44,14 +53,14 @@ export const transactionModel = {
     },
     async createAsync(
         signature: string,
-        expiration: number,
+        expirationTimeSeconds: number,
         takerAddress: string,
         orders: OrderWithoutExchangeAddress[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<TransactionEntity> {
         let transactionEntity = new TransactionEntity();
         transactionEntity.signature = signature;
-        transactionEntity.expirationTimeSeconds = expiration;
+        transactionEntity.expirationTimeSeconds = expirationTimeSeconds;
         transactionEntity.takerAddress = takerAddress;
 
         const orderEntities: OrderEntity[] = [];
@@ -82,7 +91,7 @@ export const transactionModel = {
         takerAddress: string,
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
-        const transactions = await transactionModel.findByOrdersAsync(orders, takerAddress);
+        const transactions = await transactionModel.findByOrdersAsync(orders, { takerAddress });
         const orderHashToFillAmount: OrderHashToFillAmount = {};
         for (const transaction of transactions) {
             const relevantOrders = _.filter(transaction.orders, o => _.includes(orderHashes, o.hash));
@@ -108,7 +117,7 @@ export const transactionModel = {
         coordinatorOrders: OrderWithoutExchangeAddress[],
     ): Promise<OutstandingSignature[]> {
         const coordinatorOrderHashes = _.map(coordinatorOrders, o => orderModel.getHash(o));
-        const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders);
+        const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders, { isUnexpired: true });
         const outstandingSignatures: OutstandingSignature[] = [];
         _.each(transactions, transaction => {
             _.each(transaction.orders, order => {

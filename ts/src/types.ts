@@ -26,7 +26,7 @@ export enum RequestTransactionErrors {
 
 export interface RequestTransactionResponse {
     signature: string;
-    expiration: number;
+    expirationTimeSeconds: number;
 }
 
 export interface CoordinatorApproval {

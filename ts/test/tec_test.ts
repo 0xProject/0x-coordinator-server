@@ -374,6 +374,38 @@ describe('Coordinator server', () => {
             expect(fillResponse.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(fillResponse.text).to.be.equal(RequestTransactionErrors.OrderCancelled);
         });
+        it('should return 200 OK to order cancellation request & return outstandingSignatures', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+
+            // Request to fill order
+            const takerAssetFillAmount = order.takerAssetAmount.div(2);
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
+            let body = {
+                signedTransaction,
+            };
+            const fillResponse = await request(app)
+                .post('/v1/request_transaction')
+                .send(body);
+            expect(fillResponse.status).to.be.equal(HttpStatus.OK);
+
+            // Once fill request granted, request to cancel order
+            const cancelTxData = transactionEncoder.cancelOrderTx(order);
+            const signedCancelTransaction = createSignedTransaction(cancelTxData, makerAddress);
+            body = {
+                signedTransaction: signedCancelTransaction,
+            };
+            const response = await request(app)
+                .post('/v1/request_transaction')
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body).to.be.instanceOf(Array);
+            expect(response.body.length).to.be.equal(1);
+            expect(response.body[0].signature).to.be.equal(fillResponse.body.signature);
+            expect(response.body[0].expirationTimeSeconds).to.be.equal(fillResponse.body.expirationTimeSeconds);
+            expect(response.body[0].takerAssetFillAmount).to.be.bignumber.equal(takerAssetFillAmount);
+        });
         it('should return 200 OK if request to fill uncancelled order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
@@ -389,13 +421,13 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
             const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
             expect(transactionEntityIfExists).to.not.be.undefined();
             expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
-                response.body.expiration,
+                response.body.expirationTimeSeconds,
             );
             expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(1);
             expect(
@@ -423,13 +455,13 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
             const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
             expect(transactionEntityIfExists).to.not.be.undefined();
             expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
-                response.body.expiration,
+                response.body.expirationTimeSeconds,
             );
             expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
 
@@ -467,13 +499,13 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
             const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
             expect(transactionEntityIfExists).to.not.be.undefined();
             expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
-                response.body.expiration,
+                response.body.expirationTimeSeconds,
             );
             expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
 
@@ -515,7 +547,7 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expiration).to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             response = await request(app)
                 .post('/v1/request_transaction')
@@ -563,6 +595,8 @@ describe('Coordinator server', () => {
                     .post('/v1/request_transaction')
                     .send(cancelBody);
                 expect(response.status).to.be.equal(HttpStatus.OK);
+                expect(response.body).to.be.instanceOf(Array);
+                expect(response.body.length).to.be.equal(0);
 
                 updateSelectiveDelay(selectiveDelayMs); // Reset the selective delay at end of test
             })();
