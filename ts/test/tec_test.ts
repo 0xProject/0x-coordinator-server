@@ -92,7 +92,6 @@ describe('Coordinator server', () => {
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
         [owner, senderAddress, makerAddress, takerAddress, coordinatorSignerAddress] = _.slice(accounts, 0, 6);
-        owner = owner; // TODO(fabio): Remove later, once we use owner
         coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
 
         contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
