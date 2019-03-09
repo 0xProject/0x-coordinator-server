@@ -165,6 +165,7 @@ export class Handlers {
     public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
         // 1. Validate request schema
         utils.validateSchema(req.body, requestTransactionSchema);
+        const txOrigin = req.body.txOrigin;
 
         // 2. Decode the supplied transaction data
         const signedTransaction: SignedZeroExTransaction = {
@@ -228,6 +229,7 @@ export class Handlers {
                 const response = await this._handleFillsAsync(
                     decodedCalldata.functionName,
                     coordinatorOrders,
+                    txOrigin,
                     signedTransaction,
                     takerAssetFillAmounts,
                 );
@@ -391,6 +393,7 @@ export class Handlers {
     private async _handleFillsAsync(
         functionName: string,
         coordinatorOrders: OrderWithoutExchangeAddress[],
+        txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         takerAssetFillAmounts: BigNumber[],
     ): Promise<Response> {
@@ -440,6 +443,7 @@ export class Handlers {
         }
 
         const response = await this._generateAndStoreSignatureAsync(
+            txOrigin,
             signedTransaction,
             coordinatorOrders,
             takerAssetFillAmounts,
@@ -450,6 +454,7 @@ export class Handlers {
         };
     }
     private async _generateAndStoreSignatureAsync(
+        txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         orders: OrderWithoutExchangeAddress[],
         takerAssetFillAmounts: BigNumber[],
@@ -459,6 +464,7 @@ export class Handlers {
             utils.getCurrentTimestampSeconds() + getConfigs().EXPIRATION_DURATION_SECONDS;
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const coordinatorApproval: CoordinatorApproval = {
+            txOrigin,
             transactionHash,
             transactionSignature: signedTransaction.signature,
             approvalExpirationTimeSeconds,
@@ -466,6 +472,7 @@ export class Handlers {
         const COORDINATOR_APPROVAL_SCHEMA = {
             name: 'CoordinatorApproval',
             parameters: [
+                { name: 'txOrigin', type: 'address' },
                 { name: 'transactionHash', type: 'bytes32' },
                 { name: 'transactionSignature', type: 'bytes' },
                 { name: 'approvalExpirationTimeSeconds', type: 'uint256' },
@@ -512,4 +519,4 @@ export class Handlers {
             expirationTimeSeconds: approvalExpirationTimeSeconds,
         };
     }
-}
+} // tslint:disable:max-file-line-count

@@ -11,6 +11,9 @@
             },
             "required": ["verifyingContractAddress", "data", "salt", "signerAddress", "signature"],
             "type": "object"
+        },
+        "txOrigin": {
+            "$ref": "/addressSchema"
         }
     },
     "required": ["signedTransaction"],

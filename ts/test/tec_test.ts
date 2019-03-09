@@ -242,6 +242,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -255,6 +256,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(invalidData, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -270,6 +272,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, notMakerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: notMakerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -287,6 +290,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, makerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: makerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -309,6 +313,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: makerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -331,6 +336,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, notMakerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: notMakerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -349,6 +355,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: makerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -367,6 +374,7 @@ describe('Coordinator server', () => {
             const signedFillTransaction = createSignedTransaction(fillTxData, takerAddress);
             const fillBody = {
                 signedTransaction: signedFillTransaction,
+                txOrigin: takerAddress,
             };
             const fillResponse = await request(app)
                 .post('/v1/request_transaction')
@@ -384,6 +392,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             let body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const fillResponse = await request(app)
                 .post('/v1/request_transaction')
@@ -395,6 +404,7 @@ describe('Coordinator server', () => {
             const signedCancelTransaction = createSignedTransaction(cancelTxData, makerAddress);
             body = {
                 signedTransaction: signedCancelTransaction,
+                txOrigin: makerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -414,6 +424,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -448,6 +459,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -492,6 +504,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -540,6 +553,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             let response = await request(app)
                 .post('/v1/request_transaction')
@@ -571,6 +585,7 @@ describe('Coordinator server', () => {
                 const signedFillTransaction = createSignedTransaction(data, takerAddress);
                 const fillBody = {
                     signedTransaction: signedFillTransaction,
+                    txOrigin: takerAddress,
                 };
                 // Don't block here, but continue
                 request(app)
@@ -590,6 +605,7 @@ describe('Coordinator server', () => {
                 const signedCancelTransaction = createSignedTransaction(cancelTxData, makerAddress);
                 const cancelBody = {
                     signedTransaction: signedCancelTransaction,
+                    txOrigin: makerAddress,
                 };
                 const response = await request(app)
                     .post('/v1/request_transaction')
@@ -629,6 +645,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: takerAddress,
             };
             const headers = new Headers({
                 'content-type': 'application/json',
@@ -673,6 +690,7 @@ describe('Coordinator server', () => {
             const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
+                txOrigin: makerAddress,
             };
             const headers = new Headers({
                 'content-type': 'application/json',

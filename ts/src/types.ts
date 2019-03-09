@@ -30,6 +30,7 @@ export interface RequestTransactionResponse {
 }
 
 export interface CoordinatorApproval {
+    txOrigin: string;
     transactionHash: string;
     transactionSignature: string;
     approvalExpirationTimeSeconds: number;
