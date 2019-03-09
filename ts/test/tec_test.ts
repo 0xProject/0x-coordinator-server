@@ -1,4 +1,11 @@
-import { assetDataUtils, ContractWrappers, orderHashUtils, SignatureType, ZeroExTransaction } from '0x.js';
+import {
+    assetDataUtils,
+    ContractWrappers,
+    orderHashUtils,
+    SignatureType,
+    SignedZeroExTransaction,
+    ZeroExTransaction,
+} from '0x.js';
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
@@ -232,9 +239,7 @@ describe('Coordinator server', () => {
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -247,9 +252,7 @@ describe('Coordinator server', () => {
         it('should return 400 if transaction cannot be decoded', async () => {
             const invalidData =
                 '0xa4be84d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c60629ac12f9da01839cabc64cb7d0ddeee4bdda46e6b9b00f66cb469d57bcd871fb6fb000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421c45cd8e03845be9c5878cd2fec5ae2b75ff36de4ff331680d4e6cca57c8b9d38f2ad9af72e5f56f3c2da6eff57373dca43122642c5fa29d0a83b4f63f413c083a03000000000000000000000000000000000000000000000000000000000000';
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(invalidData, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(invalidData, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -263,9 +266,8 @@ describe('Coordinator server', () => {
             const order = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.batchCancelOrdersTx([order]);
-            const notMakerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(notMakerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const notMakerAddress = takerAddress;
+            const signedTransaction = createSignedTransaction(data, notMakerAddress);
             const body = {
                 signedTransaction,
             };
@@ -282,9 +284,7 @@ describe('Coordinator server', () => {
             });
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.batchCancelOrdersTx([coordinatorOrder, notCoordinatorOrder]);
-            const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
-            transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, makerAddress);
             const body = {
                 signedTransaction,
             };
@@ -306,9 +306,7 @@ describe('Coordinator server', () => {
             const orderTwo = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const cancelTxData = transactionEncoder.batchCancelOrdersTx([orderOne, orderTwo]);
-            const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
-            transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(cancelTxData, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
             };
@@ -329,9 +327,8 @@ describe('Coordinator server', () => {
             const order = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.cancelOrderTx(order);
-            const notMakerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(owner)];
-            transactionFactory = new TransactionFactory(notMakerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const notMakerAddress = owner;
+            const signedTransaction = createSignedTransaction(data, notMakerAddress);
             const body = {
                 signedTransaction,
             };
@@ -349,9 +346,7 @@ describe('Coordinator server', () => {
             const order = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const cancelTxData = transactionEncoder.cancelOrderTx(order);
-            const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
-            transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(cancelTxData, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
             };
@@ -369,9 +364,7 @@ describe('Coordinator server', () => {
             // Check that someone trying to fill the order, can't
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const fillTxData = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedFillTransaction = transactionFactory.newSignedTransaction(fillTxData, SignatureType.EthSign);
+            const signedFillTransaction = createSignedTransaction(fillTxData, takerAddress);
             const fillBody = {
                 signedTransaction: signedFillTransaction,
             };
@@ -386,9 +379,7 @@ describe('Coordinator server', () => {
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -422,9 +413,7 @@ describe('Coordinator server', () => {
             const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.marketSellOrdersTx([orderOne, orderTwo], takerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -468,9 +457,7 @@ describe('Coordinator server', () => {
             const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.marketBuyOrdersTx([orderOne, orderTwo], makerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -518,9 +505,7 @@ describe('Coordinator server', () => {
             const takerAssetFillAmount = order.takerAssetAmount; // Full amount
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -551,9 +536,7 @@ describe('Coordinator server', () => {
                 const takerAssetFillAmount = order.takerAssetAmount.div(2);
                 const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
                 const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
-                const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-                transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-                const signedFillTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+                const signedFillTransaction = createSignedTransaction(data, takerAddress);
                 const fillBody = {
                     signedTransaction: signedFillTransaction,
                 };
@@ -572,12 +555,7 @@ describe('Coordinator server', () => {
 
                 // Do cancellation request
                 const cancelTxData = transactionEncoder.cancelOrderTx(order);
-                const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
-                transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
-                const signedCancelTransaction = transactionFactory.newSignedTransaction(
-                    cancelTxData,
-                    SignatureType.EthSign,
-                );
+                const signedCancelTransaction = createSignedTransaction(cancelTxData, makerAddress);
                 const cancelBody = {
                     signedTransaction: signedCancelTransaction,
                 };
@@ -614,9 +592,7 @@ describe('Coordinator server', () => {
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
-            const takerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(takerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
             };
@@ -660,9 +636,7 @@ describe('Coordinator server', () => {
             const order = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const cancelTxData = transactionEncoder.cancelOrderTx(order);
-            const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
-            transactionFactory = new TransactionFactory(makerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(cancelTxData, SignatureType.EthSign);
+            const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
             };
@@ -715,3 +689,10 @@ function onMessage(client: WebSocket.w3cwebsocket, messageNumber: number): Array
 
     return promises;
 } // tslint:disable:max-file-line-count
+
+function createSignedTransaction(data: string, signerAddress: string): SignedZeroExTransaction {
+    const privateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(signerAddress)];
+    transactionFactory = new TransactionFactory(privateKey, contractAddresses.exchange);
+    const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+    return signedTransaction;
+}
