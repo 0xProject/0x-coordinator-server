@@ -81,3 +81,10 @@ export interface OrderHashToFillAmount {
 export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEvent | CancelRequestAccepted;
 
 export type BroadcastCallback = (message: BroadcastMessage) => void;
+
+export interface OutstandingSignature {
+    signature: string;
+    expirationTimeSeconds: number;
+    orderHash: string;
+    takerAssetFillAmount: BigNumber;
+}

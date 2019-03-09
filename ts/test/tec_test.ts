@@ -292,6 +292,8 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body).to.be.instanceOf(Array);
+            expect(response.body.length).to.be.equal(0);
 
             // Check that only the Coordinator order got cancelled in DB
             let isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
@@ -314,28 +316,14 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body).to.be.instanceOf(Array);
+            expect(response.body.length).to.be.equal(0);
 
             // Check that orders cancelled in DB
             let isCancelled = await orderModel.isCancelledAsync(orderOne);
             expect(isCancelled).to.be.true();
             isCancelled = await orderModel.isCancelledAsync(orderTwo);
             expect(isCancelled).to.be.true();
-        });
-        it('should return 400 if cancellation transaction not signed by order maker', async () => {
-            const order = await orderFactory.newSignedOrderAsync();
-            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
-            const data = transactionEncoder.cancelOrderTx(order);
-            const notMakerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(takerAddress)];
-            transactionFactory = new TransactionFactory(notMakerPrivateKey, contractAddresses.exchange);
-            const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
-            const body = {
-                signedTransaction,
-            };
-            const response = await request(app)
-                .post('/v1/request_transaction')
-                .send(body);
-            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
         });
         it('should return 400 and leave order uncancelled if non-maker tried to cancel an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -371,6 +359,8 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body).to.be.instanceOf(Array);
+            expect(response.body.length).to.be.equal(0);
 
             // Check that order cancelled in DB
             const isCancelled = await orderModel.isCancelledAsync(order);

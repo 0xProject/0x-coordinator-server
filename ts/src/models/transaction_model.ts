@@ -7,7 +7,7 @@ import { OrderEntity } from '../entities/order_entity';
 import { TakerAssetFillAmountEntity } from '../entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../entities/transaction_entity';
 import { takerAssetFillAmountModel } from '../models/taker_asset_fill_amount_model';
-import { OrderHashToFillAmount } from '../types';
+import { OrderHashToFillAmount, OutstandingSignature } from '../types';
 
 import { orderModel } from './order_model';
 
@@ -103,5 +103,33 @@ export const transactionModel = {
             }
         }
         return orderHashToFillAmount;
+    },
+    async getOutstandingSignaturesByOrdersAsync(
+        coordinatorOrders: OrderWithoutExchangeAddress[],
+    ): Promise<OutstandingSignature[]> {
+        const coordinatorOrderHashes = _.map(coordinatorOrders, o => orderModel.getHash(o));
+        const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders);
+        const outstandingSignatures: OutstandingSignature[] = [];
+        _.each(transactions, transaction => {
+            _.each(transaction.orders, order => {
+                if (_.includes(coordinatorOrderHashes, order.hash)) {
+                    const fillAmount = _.find(transaction.takerAssetFillAmounts, { orderHash: order.hash });
+                    if (fillAmount === undefined) {
+                        throw new Error(
+                            `Unexpected failure. Found order in transaction without corresponding fillAmount: ${
+                                order.hash
+                            }`,
+                        );
+                    }
+                    outstandingSignatures.push({
+                        orderHash: order.hash,
+                        signature: transaction.signature,
+                        expirationTimeSeconds: transaction.expirationTimeSeconds,
+                        takerAssetFillAmount: fillAmount.takerAssetFillAmount,
+                    });
+                }
+            });
+        });
+        return outstandingSignatures;
     },
 };

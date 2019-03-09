@@ -382,8 +382,10 @@ export class Handlers {
             },
         };
         this._broadcastCallback(cancelRequestAccepted);
+        const outstandingSignatures = await transactionModel.getOutstandingSignaturesByOrdersAsync(coordinatorOrders);
         return {
             status: HttpStatus.OK,
+            body: outstandingSignatures,
         };
     }
     private async _handleFillsAsync(
