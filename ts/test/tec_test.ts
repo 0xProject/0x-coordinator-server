@@ -571,6 +571,7 @@ describe('Coordinator server', () => {
         // TODO(fabio): Add test for verifying that if two requests sitting on Selective Delay, the second
         // to complete takes into account the changes in fillAmounts requested from the first order.
         it('should abort fill request if cancellation received during selective delay', done => {
+            // tslint:disable-next-line:no-floating-promises
             (async () => {
                 const selectiveDelayMs = getConfigs().SELECTIVE_DELAY_MS;
                 const selectiveDelayForThisTestMs = 1000;
@@ -587,6 +588,7 @@ describe('Coordinator server', () => {
                     txOrigin: takerAddress,
                 };
                 // Don't block here, but continue
+                // tslint:disable-next-line:no-floating-promises
                 request(app)
                     .post('/v1/request_transaction')
                     .send(fillBody)

@@ -25,6 +25,9 @@ if (_.isEmpty(process.env.FEE_RECIPIENT)) {
 // Singleton
 let configs: Configs;
 
+/**
+ * Initialize the configs - must be called before the first time the configs are used
+ */
 export function initConfigs(): void {
     configs = {
         // Network port to listen on
@@ -61,6 +64,10 @@ export function initConfigs(): void {
     };
 }
 
+/**
+ * Retrieve the configs singleton
+ * @return The configs object
+ */
 export function getConfigs(): Configs {
     if (configs === undefined) {
         throw new Error('Configs must be initialized before use');
@@ -68,6 +75,10 @@ export function getConfigs(): Configs {
     return configs;
 }
 
+/**
+ * Update the selective delay config -- used for testing purposes
+ * @param delayInMs The new selective delay desired
+ */
 export function updateSelectiveDelay(delayInMs: number): void {
     configs.SELECTIVE_DELAY_MS = delayInMs;
 }

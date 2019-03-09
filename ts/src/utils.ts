@@ -29,7 +29,6 @@ export const utils = {
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);
     },
-    // TODO(fabio): Allow operator to specify multiple feeRecipientAddresses
     isCoordinatorFeeRecipient(feeRecipientAddress: string): boolean {
         return feeRecipientAddress === getConfigs().FEE_RECIPIENT;
     },
