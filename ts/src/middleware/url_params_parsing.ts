@@ -29,7 +29,7 @@ function parseNetworkId(supportedNetworkIds: number[], networkIdStrIfExists?: st
             const validationErrorItem = {
                 field: 'networkId',
                 code: 1004,
-                reason: `Unsupported Network ID: ${networkIdStrIfExists}`,
+                reason: `Network id ${networkIdStrIfExists} is not supported`,
             };
             throw new ValidationError([validationErrorItem]);
         }

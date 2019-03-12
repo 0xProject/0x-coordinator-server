@@ -200,6 +200,12 @@ export class Handlers {
         const txOrigin = req.body.txOrigin;
         const networkId = req.networkId;
 
+        const supportedNetworkIds = _.map(_.keys(this._networkIdToProvider), networkIdStr => _.parseInt(networkIdStr));
+        if (!_.includes(supportedNetworkIds, networkId)) {
+            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.NetworkNotSupported);
+            return;
+        }
+
         // 2. Decode the supplied transaction data
         const signedTransaction: SignedZeroExTransaction = {
             ...req.body.signedTransaction,

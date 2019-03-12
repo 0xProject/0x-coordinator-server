@@ -1,4 +1,5 @@
 import { BigNumber, ContractWrappers, ZeroExTransaction } from '0x.js';
+import { ExchangeContract } from '@0x/abi-gen-wrappers';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order } from '@0x/types';
 import * as WebSocket from 'websocket';
@@ -21,6 +22,8 @@ export enum RequestTransactionErrors {
     FillRequestAlreadyIssued = 'FILL_REQUEST_ALREADY_ISSUED',
     FillRequestsExceededTakerAssetAmount = 'FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT',
     DelegatingTransactionSubmissionDisabled = 'DELEGATING_TRANSACTION_SUBMISSION_DISABLED',
+    NetworkNotSupported = 'NETWORK_NOT_SUPPORTED',
+    IncorrectPathForWsConnection = 'INCORRECT_PATH_FOR_WEBSOCKET_CONNECTION',
 }
 
 export interface RequestTransactionResponse {
