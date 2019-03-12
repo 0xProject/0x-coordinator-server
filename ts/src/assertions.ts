@@ -3,7 +3,6 @@ import { BigNumber } from '0x.js';
 import { assert } from '@0x/assert';
 import * as _ from 'lodash';
 
-import { constants } from './constants';
 import { Configs } from './types';
 
 enum EnvVarType {
@@ -16,20 +15,18 @@ enum EnvVarType {
 }
 
 export function assertConfigsAreValid(configs: Configs): void {
-    if (_.isEmpty(configs.FEE_RECIPIENT_PRIVATE_KEY) || configs.FEE_RECIPIENT === constants.PLACEHOLDER) {
-        throw new Error('FEE_RECIPIENT_PRIVATE_KEY must be specified');
-    }
-    if (_.isEmpty(configs.FEE_RECIPIENT) || configs.FEE_RECIPIENT_PRIVATE_KEY === constants.PLACEHOLDER) {
-        throw new Error('FEE_RECIPIENT must be specified');
-    }
-
     assertEnvVarType('HTTP_PORT', configs.HTTP_PORT, EnvVarType.Port);
-    assertEnvVarType('NETWORK_ID', configs.NETWORK_ID, EnvVarType.Integer);
-    assertEnvVarType('RPC_URL', configs.RPC_URL, EnvVarType.Url);
-    assertEnvVarType('FEE_RECIPIENT', configs.FEE_RECIPIENT, EnvVarType.FeeRecipient);
-    assertEnvVarType('FEE_RECIPIENT_PRIVATE_KEY', configs.FEE_RECIPIENT_PRIVATE_KEY, EnvVarType.FeeRecipientPrivateKey);
     assertEnvVarType('SELECTIVE_DELAY_MS', configs.SELECTIVE_DELAY_MS, EnvVarType.Integer);
     assertEnvVarType('EXPIRATION_DURATION_SECONDS', configs.EXPIRATION_DURATION_SECONDS, EnvVarType.Integer);
+
+    const networkIds = _.keys(configs.NETWORK_ID_TO_SETTINGS);
+    _.each(networkIds, networkId => assert.isNumber('networkId', _.parseInt(networkId)));
+    const networkSpecificSettings = _.values(configs.NETWORK_ID_TO_SETTINGS);
+    _.each(networkSpecificSettings, settings => {
+        assert.isETHAddressHex('settings.FEE_RECIPIENT_ADDRESS', settings.FEE_RECIPIENT_ADDRESS);
+        assert.isString('settings.FEE_RECIPIENT_PRIVATE_KEY', settings.FEE_RECIPIENT_PRIVATE_KEY);
+        assert.isUri('settings.RPC_URL', settings.RPC_URL);
+    });
 }
 
 function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): any {
@@ -54,18 +51,6 @@ function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): a
                 throw new Error(`${name} must be a valid integer, found ${value}.`);
             }
             return returnValue;
-
-        case EnvVarType.FeeRecipient:
-            assert.isETHAddressHex(name, value);
-            return value;
-
-        case EnvVarType.FeeRecipientPrivateKey:
-            assert.isString(name, value);
-            return value;
-
-        case EnvVarType.Url:
-            assert.isUri(name, value);
-            return value;
 
         case EnvVarType.UnitAmount:
             try {

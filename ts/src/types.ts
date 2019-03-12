@@ -1,12 +1,10 @@
-import { BigNumber, ZeroExTransaction } from '0x.js';
+import { BigNumber, ContractWrappers, ZeroExTransaction } from '0x.js';
+import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order } from '@0x/types';
 
 export interface Configs {
     HTTP_PORT: number;
-    NETWORK_ID: number;
-    RPC_URL: string;
-    FEE_RECIPIENT: string;
-    FEE_RECIPIENT_PRIVATE_KEY: string;
+    NETWORK_ID_TO_SETTINGS: NetworkIdToNetworkSpecificSettings;
     SELECTIVE_DELAY_MS: number;
     EXPIRATION_DURATION_SECONDS: number;
 }
@@ -88,4 +86,22 @@ export interface OutstandingSignature {
     expirationTimeSeconds: number;
     orderHash: string;
     takerAssetFillAmount: BigNumber;
+}
+
+export interface NetworkSpecificSettings {
+    FEE_RECIPIENT_ADDRESS: string;
+    FEE_RECIPIENT_PRIVATE_KEY: string;
+    RPC_URL: string;
+}
+
+export interface NetworkIdToNetworkSpecificSettings {
+    [networkId: number]: NetworkSpecificSettings;
+}
+
+export interface NetworkIdToProvider {
+    [networkId: number]: Web3ProviderEngine;
+}
+
+export interface NetworkIdToContractWrappers {
+    [networkId: number]: ContractWrappers;
 }

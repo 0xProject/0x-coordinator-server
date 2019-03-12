@@ -1,10 +1,16 @@
-import { ContractWrappers, DecodedCalldata, OrderAndTraderInfo, signatureUtils, transactionHashUtils } from '0x.js';
+import {
+    ContractWrappers,
+    DecodedCalldata,
+    OrderAndTraderInfo,
+    signatureUtils,
+    transactionHashUtils,
+    Web3ProviderEngine,
+} from '0x.js';
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { eip712Utils } from '@0x/order-utils';
 import { Order, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, signTypedDataUtils } from '@0x/utils';
-import { Provider } from 'ethereum-types';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
@@ -18,6 +24,8 @@ import {
     Configs,
     CoordinatorApproval,
     EventTypes,
+    NetworkIdToContractWrappers,
+    NetworkIdToProvider,
     RequestTransactionErrors,
     RequestTransactionResponse,
     Response,
@@ -43,9 +51,9 @@ enum ExchangeMethods {
 }
 
 export class Handlers {
-    private readonly _provider: Provider;
+    private readonly _networkIdToProvider: NetworkIdToProvider;
     private readonly _broadcastCallback: BroadcastCallback;
-    private readonly _contractWrappers: ContractWrappers;
+    private readonly _networkIdToContractWrappers: NetworkIdToContractWrappers;
     private readonly _configs: Configs;
     private static _calculateRemainingFillableTakerAssetAmount(
         signedOrder: SignedOrder,
@@ -103,130 +111,21 @@ export class Handlers {
         const maxTakerAssetFillAmount = BigNumber.min(...minSet);
         return maxTakerAssetFillAmount;
     }
-    constructor(provider: Provider, configs: Configs, broadcastCallback: BroadcastCallback) {
-        this._provider = provider;
-        this._broadcastCallback = broadcastCallback;
-        this._configs = configs;
-        this._contractWrappers = new ContractWrappers(provider, {
-            networkId: configs.NETWORK_ID,
-        });
-    }
-    public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
-        // 1. Validate request schema
-        utils.validateSchema(req.body, requestTransactionSchema);
-        const txOrigin = req.body.txOrigin;
-
-        // 2. Decode the supplied transaction data
-        const signedTransaction: SignedZeroExTransaction = {
-            ...req.body.signedTransaction,
-            salt: new BigNumber(req.body.signedTransaction.salt),
-        };
-        let decodedCalldata: DecodedCalldata;
-        try {
-            decodedCalldata = this._contractWrappers
-                .getAbiDecoder()
-                .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
-        } catch (err) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.DecodingTransactionFailed);
-            return;
-        }
-
-        // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
-        let orders: Order[] = [];
-        try {
-            orders = this._getOrdersFromDecodedCallData(decodedCalldata);
-        } catch (err) {
-            res.status(HttpStatus.BAD_REQUEST).send(err.message);
-            return;
-        }
-        const coordinatorOrders = _.filter(orders, order =>
-            utils.isCoordinatorFeeRecipient(order.feeRecipientAddress, this._configs.FEE_RECIPIENT),
-        );
-        if (_.isEmpty(coordinatorOrders)) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
-            return;
-        }
-
-        // 4. Validate the 0x transaction signature
-        const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
-        const isValidSignature = await signatureUtils.isValidSignatureAsync(
-            this._provider,
-            transactionHash,
-            signedTransaction.signature,
-            signedTransaction.signerAddress,
-        );
-        if (!isValidSignature) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidTransactionSignature);
-            return;
-        }
-
-        // 5. Handle the request
-        switch (decodedCalldata.functionName) {
-            case ExchangeMethods.FillOrder:
-            case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
-            case ExchangeMethods.BatchFillOrders:
-            case ExchangeMethods.BatchFillOrKillOrders:
-            case ExchangeMethods.BatchFillOrdersNoThrow:
-            case ExchangeMethods.MarketSellOrders:
-            case ExchangeMethods.MarketSellOrdersNoThrow:
-            case ExchangeMethods.MarketBuyOrders:
-            case ExchangeMethods.MarketBuyOrdersNoThrow: {
-                const takerAddress = signedTransaction.signerAddress;
-                const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCallDataAsync(
-                    decodedCalldata,
-                    takerAddress,
-                );
-                const response = await this._handleFillsAsync(
-                    decodedCalldata.functionName,
-                    coordinatorOrders,
-                    txOrigin,
-                    signedTransaction,
-                    takerAssetFillAmounts,
-                );
-                res.status(response.status).send(response.body);
-                // After responding to taker's request, we broadcast the fill acceptance to all WS connections
-                const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
-                const fillRequestAcceptedEvent = {
-                    type: EventTypes.FillRequestAccepted,
-                    data: {
-                        functionName: decodedCalldata.functionName,
-                        orders: coordinatorOrders,
-                        zeroExTransaction: unsignedTransaction,
-                        coordinatorSignature: response.body.signature,
-                        coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
-                    },
-                };
-                this._broadcastCallback(fillRequestAcceptedEvent);
-                return;
-            }
-
-            case ExchangeMethods.CancelOrder:
-            case ExchangeMethods.BatchCancelOrders: {
-                const response = await this._handleCancelsAsync(coordinatorOrders, signedTransaction);
-                res.status(response.status).send(response.body);
-                return;
-            }
-
-            default:
-                res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidFunctionCall);
-                return;
-        }
-    }
-    private _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): Order[] {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(this._configs.NETWORK_ID);
+    private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata, networkId: number): Order[] {
+        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
 
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
             case ExchangeMethods.FillOrderNoThrow:
-            case ExchangeMethods.CancelOrder:
+            case ExchangeMethods.CancelOrder: {
                 const orderWithoutExchangeAddress = decodedCalldata.functionArguments.order;
                 const order = {
                     ...orderWithoutExchangeAddress,
                     exchangeAddress: contractAddresses.exchange,
                 };
                 return [order];
+            }
 
             case ExchangeMethods.BatchFillOrders:
             case ExchangeMethods.BatchFillOrKillOrders:
@@ -235,7 +134,7 @@ export class Handlers {
             case ExchangeMethods.MarketSellOrdersNoThrow:
             case ExchangeMethods.MarketBuyOrders:
             case ExchangeMethods.MarketBuyOrdersNoThrow:
-            case ExchangeMethods.BatchCancelOrders:
+            case ExchangeMethods.BatchCancelOrders: {
                 const ordersWithoutExchangeAddress = decodedCalldata.functionArguments.orders;
                 const orders = _.map(ordersWithoutExchangeAddress, orderWithoutExchangeAddress => {
                     return {
@@ -244,12 +143,13 @@ export class Handlers {
                     };
                 });
                 return orders;
+            }
 
             default:
                 throw new Error(RequestTransactionErrors.InvalidFunctionCall);
         }
     }
-    private async _validateFillsAllowedOrThrowAsync(
+    private static async _validateFillsAllowedOrThrowAsync(
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
@@ -281,11 +181,135 @@ export class Handlers {
             }
         }
     }
+    constructor(networkIdToProvider: NetworkIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
+        this._networkIdToProvider = networkIdToProvider;
+        this._broadcastCallback = broadcastCallback;
+        this._configs = configs;
+        this._networkIdToContractWrappers = {};
+        _.each(networkIdToProvider, (provider: Web3ProviderEngine, networkIdStr: string) => {
+            const contractWrappers = new ContractWrappers(provider, {
+                networkId: _.parseInt(networkIdStr),
+            });
+            const networkId = _.parseInt(networkIdStr);
+            this._networkIdToContractWrappers[networkId] = contractWrappers;
+        });
+    }
+    public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
+        // 1. Validate request schema
+        utils.validateSchema(req.body, requestTransactionSchema);
+        const txOrigin = req.body.txOrigin;
+        const networkId = req.networkId;
+
+        // 2. Decode the supplied transaction data
+        const signedTransaction: SignedZeroExTransaction = {
+            ...req.body.signedTransaction,
+            salt: new BigNumber(req.body.signedTransaction.salt),
+        };
+        let decodedCalldata: DecodedCalldata;
+        try {
+            const contractWrappers = this._networkIdToContractWrappers[networkId];
+            decodedCalldata = contractWrappers
+                .getAbiDecoder()
+                .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
+        } catch (err) {
+            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.DecodingTransactionFailed);
+            return;
+        }
+
+        // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
+        let orders: Order[] = [];
+        try {
+            orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata, networkId);
+        } catch (err) {
+            res.status(HttpStatus.BAD_REQUEST).send(err.message);
+            return;
+        }
+        const coordinatorOrders = _.filter(orders, order =>
+            utils.isCoordinatorFeeRecipient(
+                order.feeRecipientAddress,
+                this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENT_ADDRESS,
+            ),
+        );
+        if (_.isEmpty(coordinatorOrders)) {
+            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
+            return;
+        }
+
+        // 4. Validate the 0x transaction signature
+        const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
+        const provider = this._networkIdToProvider[networkId];
+        const isValidSignature = await signatureUtils.isValidSignatureAsync(
+            provider,
+            transactionHash,
+            signedTransaction.signature,
+            signedTransaction.signerAddress,
+        );
+        if (!isValidSignature) {
+            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidTransactionSignature);
+            return;
+        }
+
+        // 5. Handle the request
+        switch (decodedCalldata.functionName) {
+            case ExchangeMethods.FillOrder:
+            case ExchangeMethods.FillOrKillOrder:
+            case ExchangeMethods.FillOrderNoThrow:
+            case ExchangeMethods.BatchFillOrders:
+            case ExchangeMethods.BatchFillOrKillOrders:
+            case ExchangeMethods.BatchFillOrdersNoThrow:
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow:
+            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersNoThrow: {
+                const takerAddress = signedTransaction.signerAddress;
+                const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCallDataAsync(
+                    decodedCalldata,
+                    takerAddress,
+                    networkId,
+                );
+                const response = await this._handleFillsAsync(
+                    decodedCalldata.functionName,
+                    coordinatorOrders,
+                    txOrigin,
+                    signedTransaction,
+                    takerAssetFillAmounts,
+                    networkId,
+                );
+                res.status(response.status).send(response.body);
+                // After responding to taker's request, we broadcast the fill acceptance to all WS connections
+                const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
+                const fillRequestAcceptedEvent = {
+                    type: EventTypes.FillRequestAccepted,
+                    data: {
+                        functionName: decodedCalldata.functionName,
+                        orders: coordinatorOrders,
+                        zeroExTransaction: unsignedTransaction,
+                        coordinatorSignature: response.body.signature,
+                        coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
+                    },
+                };
+                this._broadcastCallback(fillRequestAcceptedEvent);
+                return;
+            }
+
+            case ExchangeMethods.CancelOrder:
+            case ExchangeMethods.BatchCancelOrders: {
+                const response = await this._handleCancelsAsync(coordinatorOrders, signedTransaction);
+                res.status(response.status).send(response.body);
+                return;
+            }
+
+            default:
+                res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidFunctionCall);
+                return;
+        }
+    }
     private async _getTakerAssetFillAmountsFromDecodedCallDataAsync(
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
+        networkId: number,
     ): Promise<BigNumber[]> {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(this._configs.NETWORK_ID);
+        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
         let takerAssetFillAmounts: BigNumber[] = [];
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
@@ -312,7 +336,8 @@ export class Handlers {
                 _.times(signedOrders.length, () => {
                     takerAddresses.push(takerAddress);
                 });
-                const orderAndTraderInfos = await this._contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
+                const contractWrappers = this._networkIdToContractWrappers[networkId];
+                const orderAndTraderInfos = await contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
                     signedOrders,
                     takerAddresses,
                 );
@@ -342,7 +367,8 @@ export class Handlers {
                 _.times(signedOrders.length, () => {
                     takerAddresses.push(takerAddress);
                 });
-                const orderAndTraderInfos = await this._contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
+                const contractWrappers = this._networkIdToContractWrappers[networkId];
+                const orderAndTraderInfos = await contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
                     signedOrders,
                     takerAddresses,
                 );
@@ -418,9 +444,14 @@ export class Handlers {
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         takerAssetFillAmounts: BigNumber[],
+        networkId: number,
     ): Promise<Response> {
         try {
-            await this._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
+            await Handlers._validateFillsAllowedOrThrowAsync(
+                signedTransaction,
+                coordinatorOrders,
+                takerAssetFillAmounts,
+            );
         } catch (err) {
             if (_.includes(_.values(RequestTransactionErrors), err.message)) {
                 return {
@@ -445,7 +476,11 @@ export class Handlers {
 
         // Check that still a valid fill request after selective delay
         try {
-            await this._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
+            await Handlers._validateFillsAllowedOrThrowAsync(
+                signedTransaction,
+                coordinatorOrders,
+                takerAssetFillAmounts,
+            );
         } catch (err) {
             if (_.includes(_.values(RequestTransactionErrors), err.message)) {
                 return {
@@ -461,6 +496,7 @@ export class Handlers {
             signedTransaction,
             coordinatorOrders,
             takerAssetFillAmounts,
+            networkId,
         );
         return {
             status: HttpStatus.OK,
@@ -472,6 +508,7 @@ export class Handlers {
         signedTransaction: SignedZeroExTransaction,
         orders: Order[],
         takerAssetFillAmounts: BigNumber[],
+        networkId: number,
     ): Promise<RequestTransactionResponse> {
         // generate signature & expiry and add to DB
         const approvalExpirationTimeSeconds =
@@ -499,7 +536,7 @@ export class Handlers {
         // package
         // HACK(fabio): Hard-code fake Coordinator address until we've deployed the contract and added
         // the address to `@0x/contract-addresses`
-        const contractAddresses = getContractAddressesForNetworkOrThrow(this._configs.NETWORK_ID);
+        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
         (contractAddresses as any).coordinator = constants.COORDINATOR_CONTRACT_ADDRESS;
         const domain = {
             name: '0x Protocol Trade Execution Coordinator',
@@ -515,10 +552,11 @@ export class Handlers {
         const coordinatorApprovalHashBuff = signTypedDataUtils.generateTypedDataHash(typedData);
         const coordinatorApprovalHashHex = `0x${coordinatorApprovalHashBuff.toString('hex')}`;
 
+        const provider = this._networkIdToProvider[networkId];
         const coordinatorApprovalECSignature = await signatureUtils.ecSignHashAsync(
-            this._provider,
+            provider,
             coordinatorApprovalHashHex,
-            this._configs.FEE_RECIPIENT,
+            this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENT_ADDRESS,
         );
 
         // Insert signature into DB

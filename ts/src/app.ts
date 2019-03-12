@@ -1,9 +1,9 @@
 import * as bodyParser from 'body-parser';
 import * as cors from 'cors';
-import { Provider } from 'ethereum-types';
 import * as express from 'express';
 import * as asyncHandler from 'express-async-handler';
 import * as http from 'http';
+import * as _ from 'lodash';
 import * as WebSocket from 'websocket';
 
 import { assertConfigsAreValid } from './assertions';
@@ -11,7 +11,7 @@ import { hasDBConnection, initDBConnectionAsync } from './db_connection';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { urlParamsParsing } from './middleware/url_params_parsing';
-import { BroadcastMessage, Configs } from './types';
+import { BroadcastMessage, Configs, NetworkIdToProvider } from './types';
 
 const connectionStore: Set<WebSocket.connection> = new Set();
 
@@ -19,13 +19,13 @@ const connectionStore: Set<WebSocket.connection> = new Set();
  * Creates a new express app/server
  * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing coordinator approvals
  */
-export async function getAppAsync(provider: Provider, configs: Configs): Promise<http.Server> {
+export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, configs: Configs): Promise<http.Server> {
     assertConfigsAreValid(configs);
     if (!hasDBConnection()) {
         await initDBConnectionAsync();
     }
 
-    const handlers = new Handlers(provider, configs, (event: BroadcastMessage) => {
+    const handlers = new Handlers(networkIdToProvider, configs, (event: BroadcastMessage) => {
         connectionStore.forEach((connection: WebSocket.connection) => {
             connection.sendUTF(JSON.stringify(event));
         });
@@ -33,7 +33,8 @@ export async function getAppAsync(provider: Provider, configs: Configs): Promise
     const app = express();
     app.use(cors());
     app.use(bodyParser.json());
-    app.use(urlParamsParsing.bind(undefined, configs.NETWORK_ID));
+    const supportedNetworkIds = _.map(_.keys(configs.NETWORK_ID_TO_SETTINGS), networkIdStr => _.parseInt(networkIdStr));
+    app.use(urlParamsParsing.bind(undefined, supportedNetworkIds));
 
     /**
      * POST endpoint for requesting signatures for a 0x transaction
@@ -58,6 +59,7 @@ export async function getAppAsync(provider: Provider, configs: Configs): Promise
      * WebSocket endpoint for subscribing to transaction request notifications
      */
     wss.on('request', async (request: any) => {
+        console.log('GET REQUEST');
         // If the request isn't to `/v1/requests`, reject
         if (request.resourceURL.path !== '/v1/requests') {
             request.reject(400, 'INCORRECT_PATH');
@@ -72,6 +74,7 @@ export async function getAppAsync(provider: Provider, configs: Configs): Promise
         connection.on('close', () => {
             connectionStore.delete(connection);
         });
+        console.log('ADD CONNECTION');
         connectionStore.add(connection);
     });
 

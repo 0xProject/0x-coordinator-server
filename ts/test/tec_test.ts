@@ -4,6 +4,7 @@ import {
     orderHashUtils,
     SignatureType,
     SignedZeroExTransaction,
+    Web3ProviderEngine,
     ZeroExTransaction,
 } from '0x.js';
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
@@ -17,7 +18,6 @@ import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
 import ChaiBigNumber = require('chai-bignumber');
 import * as dirtyChai from 'dirty-chai';
-import { Provider } from 'ethereum-types';
 import * as ethUtil from 'ethereumjs-util';
 import * as http from 'http';
 import * as HttpStatus from 'http-status-codes';
@@ -33,7 +33,13 @@ import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amo
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
 import { transactionModel } from '../src/models/transaction_model';
-import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, RequestTransactionErrors } from '../src/types';
+import {
+    CancelRequestAccepted,
+    EventTypes,
+    FillRequestReceivedEvent,
+    NetworkSpecificSettings,
+    RequestTransactionErrors,
+} from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
@@ -65,7 +71,7 @@ let takerTokenContract: DummyERC20TokenContract;
 let coordinatorSignerAddress: string;
 let transactionFactory: TransactionFactory;
 let orderFactory: OrderFactory;
-let provider: Provider;
+let provider: Web3ProviderEngine;
 let accounts: string[];
 let contractAddresses: ContractAddresses;
 let blockchainLifecycle: BlockchainLifecycle;
@@ -73,7 +79,10 @@ let contractWrappers: ContractWrappers;
 
 // Websocket tests only
 const TEST_PORT = 8361;
-const REQUESTS_PATH = '/v1/requests';
+const NETWORK_ID = 50;
+const WS_NOTIFICATION_ENDPOINT_PATH = '/v1/requests';
+const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
+const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
 let wsClient: WebSocket.w3cwebsocket;
 
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
@@ -96,13 +105,15 @@ describe('Coordinator server', () => {
         [owner, senderAddress, makerAddress, takerAddress, coordinatorSignerAddress] = _.slice(accounts, 0, 6);
         coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
 
-        contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
+        contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
+        // HACK(fabio): Had to cast to any to get rid of a TS error related to index signatures. To fix.
+        const settings: NetworkSpecificSettings = (configs.NETWORK_ID_TO_SETTINGS as any)[NETWORK_ID];
         const defaultOrderParams = {
             ...testConstants.STATIC_ORDER_PARAMS,
             senderAddress,
             exchangeAddress: contractAddresses.exchange,
             makerAddress,
-            feeRecipientAddress: configs.FEE_RECIPIENT,
+            feeRecipientAddress: settings.FEE_RECIPIENT_ADDRESS,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
         };
@@ -110,7 +121,7 @@ describe('Coordinator server', () => {
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
 
         contractWrappers = new ContractWrappers(provider, {
-            networkId: configs.NETWORK_ID,
+            networkId: NETWORK_ID,
         });
 
         makerTokenContract = new DummyERC20TokenContract(
@@ -191,7 +202,12 @@ describe('Coordinator server', () => {
     });
     describe('#/v1/request_transaction', () => {
         before(async () => {
-            app = await getAppAsync(provider, configs);
+            app = await getAppAsync(
+                {
+                    [NETWORK_ID]: provider,
+                },
+                configs,
+            );
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
             const invalidBody = {
@@ -208,7 +224,7 @@ describe('Coordinator server', () => {
                 },
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
         });
@@ -228,7 +244,7 @@ describe('Coordinator server', () => {
                 },
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.InvalidTransactionSignature);
@@ -246,7 +262,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
@@ -260,7 +276,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.DecodingTransactionFailed);
@@ -276,7 +292,7 @@ describe('Coordinator server', () => {
                 txOrigin: notMakerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
@@ -294,7 +310,7 @@ describe('Coordinator server', () => {
                 txOrigin: makerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
@@ -317,7 +333,7 @@ describe('Coordinator server', () => {
                 txOrigin: makerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
@@ -340,7 +356,7 @@ describe('Coordinator server', () => {
                 txOrigin: notMakerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
@@ -359,7 +375,7 @@ describe('Coordinator server', () => {
                 txOrigin: makerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
@@ -378,7 +394,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             const fillResponse = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(fillBody);
             expect(fillResponse.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(fillResponse.text).to.be.equal(RequestTransactionErrors.OrderCancelled);
@@ -396,7 +412,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             const fillResponse = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(fillResponse.status).to.be.equal(HttpStatus.OK);
 
@@ -408,7 +424,7 @@ describe('Coordinator server', () => {
                 txOrigin: makerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
@@ -435,7 +451,7 @@ describe('Coordinator server', () => {
                 txOrigin,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
@@ -470,7 +486,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
@@ -515,7 +531,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             const response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
@@ -564,7 +580,7 @@ describe('Coordinator server', () => {
                 txOrigin: takerAddress,
             };
             let response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signature).to.not.be.undefined();
@@ -572,7 +588,7 @@ describe('Coordinator server', () => {
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             response = await request(app)
-                .post('/v1/request_transaction')
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.text).to.be.equal(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
@@ -599,7 +615,7 @@ describe('Coordinator server', () => {
                 // Don't block here, but continue
                 // tslint:disable-next-line:no-floating-promises
                 request(app)
-                    .post('/v1/request_transaction')
+                    .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                     .send(fillBody)
                     .then((fillResponse: request.Response) => {
                         expect(fillResponse.status).to.be.equal(HttpStatus.BAD_REQUEST);
@@ -618,7 +634,7 @@ describe('Coordinator server', () => {
                     txOrigin: makerAddress,
                 };
                 const response = await request(app)
-                    .post('/v1/request_transaction')
+                    .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                     .send(cancelBody);
                 expect(response.status).to.be.equal(HttpStatus.OK);
                 expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
@@ -629,15 +645,20 @@ describe('Coordinator server', () => {
         });
         // TODO(fabio): Add test filling an order with a Wallet contract.
     });
-    describe(REQUESTS_PATH, () => {
+    describe(WS_NOTIFICATION_ENDPOINT_PATH, () => {
         before(async () => {
-            app = await getAppAsync(provider, configs);
+            app = await getAppAsync(
+                {
+                    [NETWORK_ID]: provider,
+                },
+                configs,
+            );
             app.listen(TEST_PORT, () => {
                 utils.log(`Coordinator SERVER API (HTTP) listening on port ${TEST_PORT}`);
             });
         });
         beforeEach(async () => {
-            wsClient = new WebSocket.w3cwebsocket(`ws://127.0.0.1:${TEST_PORT}${REQUESTS_PATH}`);
+            wsClient = new WebSocket.w3cwebsocket(`ws://127.0.0.1:${TEST_PORT}${WS_NOTIFICATION_ENDPOINT_PATH}`);
         });
         afterEach(async () => {
             wsClient.close();
@@ -660,7 +681,7 @@ describe('Coordinator server', () => {
             const headers = new Headers({
                 'content-type': 'application/json',
             });
-            await fetchAsync(`http://127.0.0.1:${TEST_PORT}/v1/request_transaction`, {
+            await fetchAsync(HTTP_REQUEST_TRANSACTION_URL, {
                 headers,
                 method: 'POST',
                 body: JSON.stringify(body),
@@ -705,7 +726,7 @@ describe('Coordinator server', () => {
             const headers = new Headers({
                 'content-type': 'application/json',
             });
-            await fetchAsync(`http://127.0.0.1:${TEST_PORT}/v1/request_transaction`, {
+            await fetchAsync(HTTP_REQUEST_TRANSACTION_URL, {
                 headers,
                 method: 'POST',
                 body: JSON.stringify(body),
