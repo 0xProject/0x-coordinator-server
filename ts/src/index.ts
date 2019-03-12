@@ -7,20 +7,22 @@ import { getConfigs, initConfigs } from './configs';
 import { utils } from './utils';
 
 (async () => {
+    initConfigs();
+    const configs = getConfigs();
+
     const providerEngine = new Web3ProviderEngine();
-    const privateKeyWalletSubprovider = new PrivateKeyWalletSubprovider(getConfigs().FEE_RECIPIENT_PRIVATE_KEY);
+    const privateKeyWalletSubprovider = new PrivateKeyWalletSubprovider(configs.FEE_RECIPIENT_PRIVATE_KEY);
     providerEngine.addProvider(privateKeyWalletSubprovider);
-    const rpcSubprovider = new RPCSubprovider(getConfigs().RPC_URL);
+    const rpcSubprovider = new RPCSubprovider(configs.RPC_URL);
     providerEngine.addProvider(rpcSubprovider);
     providerEngine.start();
 
-    initConfigs();
-    const app = await getAppAsync(providerEngine);
+    const app = await getAppAsync(providerEngine, configs);
 
-    app.listen(getConfigs().HTTP_PORT, () => {
+    app.listen(configs.HTTP_PORT, () => {
         utils.log(
-            `Coordinator SERVER API (HTTP) listening on port ${getConfigs().HTTP_PORT}!\nConfig: ${JSON.stringify(
-                getConfigs(),
+            `Coordinator SERVER API (HTTP) listening on port ${configs.HTTP_PORT}!\nConfig: ${JSON.stringify(
+                configs,
                 null,
                 2,
             )}`,

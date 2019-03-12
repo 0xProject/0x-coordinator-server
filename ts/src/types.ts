@@ -1,5 +1,5 @@
 import { BigNumber, ZeroExTransaction } from '0x.js';
-import { OrderWithoutExchangeAddress } from '@0x/types';
+import { Order } from '@0x/types';
 
 export interface Configs {
     HTTP_PORT: string;
@@ -51,7 +51,7 @@ export interface FillRequestReceivedEvent {
     type: EventTypes;
     data: {
         functionName: string;
-        ordersWithoutExchangeAddress: OrderWithoutExchangeAddress[];
+        orders: Order[];
         zeroExTransaction: ZeroExTransaction;
     };
 }
@@ -60,7 +60,7 @@ export interface FillRequestAcceptedEvent {
     type: EventTypes;
     data: {
         functionName: string;
-        ordersWithoutExchangeAddress: OrderWithoutExchangeAddress[];
+        orders: Order[];
         zeroExTransaction: ZeroExTransaction;
         coordinatorSignature: string;
         coordinatorSignatureExpiration: number;
@@ -70,7 +70,7 @@ export interface FillRequestAcceptedEvent {
 export interface CancelRequestAccepted {
     type: EventTypes;
     data: {
-        ordersWithoutExchangeAddress: OrderWithoutExchangeAddress[];
+        orders: Order[];
         zeroExTransaction: ZeroExTransaction;
     };
 }
@@ -84,7 +84,7 @@ export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEve
 export type BroadcastCallback = (message: BroadcastMessage) => void;
 
 export interface OutstandingSignature {
-    signature: string;
+    coordinatorSignature: string;
     expirationTimeSeconds: number;
     orderHash: string;
     takerAssetFillAmount: BigNumber;

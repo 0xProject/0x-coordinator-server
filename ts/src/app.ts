@@ -10,6 +10,7 @@ import { hasDBConnection, initDBConnectionAsync } from './db_connection';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { BroadcastMessage } from './types';
+import { BroadcastMessage, Configs } from './types';
 
 const connectionStore: Set<WebSocket.connection> = new Set();
 
@@ -17,12 +18,12 @@ const connectionStore: Set<WebSocket.connection> = new Set();
  * Creates a new express app/server
  * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing coordinator approvals
  */
-export async function getAppAsync(provider: Provider): Promise<http.Server> {
+export async function getAppAsync(provider: Provider, configs: Configs): Promise<http.Server> {
     if (!hasDBConnection()) {
         await initDBConnectionAsync();
     }
 
-    const handlers = new Handlers(provider, (event: BroadcastMessage) => {
+    const handlers = new Handlers(provider, configs, (event: BroadcastMessage) => {
         connectionStore.forEach((connection: WebSocket.connection) => {
             connection.sendUTF(JSON.stringify(event));
         });
@@ -51,7 +52,7 @@ export async function getAppAsync(provider: Provider): Promise<http.Server> {
     });
 
     /**
-     * WebSocket endpoint for subscribing to fill request notifications
+     * WebSocket endpoint for subscribing to transaction request notifications
      */
     wss.on('request', async (request: any) => {
         // If the request isn't to `/v1/requests`, reject

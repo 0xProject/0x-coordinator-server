@@ -1,14 +1,12 @@
-import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { orderHashUtils } from '@0x/order-utils';
-import { OrderWithoutExchangeAddress } from '@0x/types';
+import { Order } from '@0x/types';
 import * as _ from 'lodash';
 
-import { getConfigs } from '../configs';
 import { getDBConnection } from '../db_connection';
 import { OrderEntity } from '../entities/order_entity';
 
 export const orderModel = {
-    async createAsync(order: OrderWithoutExchangeAddress): Promise<OrderEntity> {
+    async createAsync(order: Order): Promise<OrderEntity> {
         let orderEntity = new OrderEntity();
         const orderHash = orderModel.getHash(order);
         orderEntity.hash = orderHash;
@@ -18,17 +16,17 @@ export const orderModel = {
         orderEntity = await connection.manager.save(OrderEntity, orderEntity);
         return orderEntity;
     },
-    async findAsync(order: OrderWithoutExchangeAddress): Promise<OrderEntity | undefined> {
+    async findAsync(order: Order): Promise<OrderEntity | undefined> {
         const orderHash = orderModel.getHash(order);
         const connection = getDBConnection();
         const orderIfExists = await connection.manager.findOne(OrderEntity, orderHash);
         return orderIfExists;
     },
-    async isCancelledAsync(order: OrderWithoutExchangeAddress): Promise<boolean> {
+    async isCancelledAsync(order: Order): Promise<boolean> {
         const orderIfExists = await orderModel.findAsync(order);
         return !_.isUndefined(orderIfExists) && orderIfExists.isCancelled;
     },
-    async cancelAsync(order: OrderWithoutExchangeAddress): Promise<void> {
+    async cancelAsync(order: Order): Promise<void> {
         const orderHash = orderModel.getHash(order);
         const connection = getDBConnection();
         const orderIfExists = await connection.manager.findOne(OrderEntity, orderHash);
@@ -43,13 +41,8 @@ export const orderModel = {
         }
         await connection.manager.save(OrderEntity, orderEntity);
     },
-    getHash(order: OrderWithoutExchangeAddress): string {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
-        const orderWithExchangeAddress = {
-            ...order,
-            exchangeAddress: contractAddresses.exchange,
-        };
-        const orderHash = orderHashUtils.getOrderHashHex(orderWithExchangeAddress);
+    getHash(order: Order): string {
+        const orderHash = orderHashUtils.getOrderHashHex(order);
         return orderHash;
     },
 };

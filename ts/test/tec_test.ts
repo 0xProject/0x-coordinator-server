@@ -9,7 +9,7 @@ import {
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
-import { constants, OrderFactory } from '@0x/contracts-test-utils';
+import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
 import { BigNumber, fetchAsync } from '@0x/utils';
 import { Web3Wrapper } from '@0x/web3-wrapper';
@@ -28,11 +28,18 @@ import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
 import { getConfigs, initConfigs, updateSelectiveDelay } from '../src/configs';
+import { constants } from '../src/constants';
 import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
 import { transactionModel } from '../src/models/transaction_model';
-import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, RequestTransactionErrors } from '../src/types';
+import {
+    CancelRequestAccepted,
+    Configs,
+    EventTypes,
+    FillRequestReceivedEvent,
+    RequestTransactionErrors,
+} from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
@@ -49,6 +56,7 @@ const TESTRPC_PRIVATE_KEYS = _.map(TESTRPC_PRIVATE_KEYS_STRINGS, privateKeyStrin
 );
 const UNLIMITED_ALLOWANCE = new BigNumber(2).pow(256).minus(1);
 
+let configs: Configs;
 let app: http.Server;
 
 let web3Wrapper: Web3Wrapper;
@@ -79,6 +87,7 @@ const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb
 describe('Coordinator server', () => {
     before(async () => {
         initConfigs();
+        configs = getConfigs();
 
         provider = web3Factory.getRpcProvider({
             shouldUseInProcessGanache: true,
@@ -94,13 +103,13 @@ describe('Coordinator server', () => {
         [owner, senderAddress, makerAddress, takerAddress, coordinatorSignerAddress] = _.slice(accounts, 0, 6);
         coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
 
-        contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
+        contractAddresses = getContractAddressesForNetworkOrThrow(configs.NETWORK_ID);
         const defaultOrderParams = {
-            ...constants.STATIC_ORDER_PARAMS,
+            ...testConstants.STATIC_ORDER_PARAMS,
             senderAddress,
             exchangeAddress: contractAddresses.exchange,
             makerAddress,
-            feeRecipientAddress: getConfigs().FEE_RECIPIENT,
+            feeRecipientAddress: configs.FEE_RECIPIENT,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
         };
@@ -108,7 +117,7 @@ describe('Coordinator server', () => {
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
 
         contractWrappers = new ContractWrappers(provider, {
-            networkId: getConfigs().NETWORK_ID,
+            networkId: configs.NETWORK_ID,
         });
 
         makerTokenContract = new DummyERC20TokenContract(
@@ -128,21 +137,21 @@ describe('Coordinator server', () => {
     beforeEach(async () => {
         await blockchainLifecycle.startAsync();
 
-        const makerBalance = constants.STATIC_ORDER_PARAMS.makerAssetAmount.times(5);
+        const makerBalance = testConstants.STATIC_ORDER_PARAMS.makerAssetAmount.times(5);
         const makerAllowance = UNLIMITED_ALLOWANCE;
-        const takerBalance = constants.STATIC_ORDER_PARAMS.takerAssetAmount.times(5);
+        const takerBalance = testConstants.STATIC_ORDER_PARAMS.takerAssetAmount.times(5);
         const takerAllowance = UNLIMITED_ALLOWANCE;
         await web3Wrapper.awaitTransactionSuccessAsync(
             await makerTokenContract.setBalance.sendTransactionAsync(makerAddress, makerBalance, {
                 from: owner,
             }),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
         await web3Wrapper.awaitTransactionSuccessAsync(
             await makerTokenContract.approve.sendTransactionAsync(contractAddresses.erc20Proxy, makerAllowance, {
                 from: makerAddress,
             }),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
         await web3Wrapper.awaitTransactionSuccessAsync(
             await contractWrappers.erc20Token.transferAsync(
@@ -151,24 +160,24 @@ describe('Coordinator server', () => {
                 makerAddress,
                 makerBalance,
             ),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
         await web3Wrapper.awaitTransactionSuccessAsync(
             await contractWrappers.erc20Token.setUnlimitedProxyAllowanceAsync(contractAddresses.zrxToken, makerAddress),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
 
         await web3Wrapper.awaitTransactionSuccessAsync(
             await takerTokenContract.setBalance.sendTransactionAsync(takerAddress, takerBalance, {
                 from: owner,
             }),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
         await web3Wrapper.awaitTransactionSuccessAsync(
             await takerTokenContract.approve.sendTransactionAsync(contractAddresses.erc20Proxy, takerAllowance, {
                 from: takerAddress,
             }),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
         await web3Wrapper.awaitTransactionSuccessAsync(
             await contractWrappers.erc20Token.transferAsync(
@@ -177,11 +186,11 @@ describe('Coordinator server', () => {
                 takerAddress,
                 takerBalance,
             ),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
         await web3Wrapper.awaitTransactionSuccessAsync(
             await contractWrappers.erc20Token.setUnlimitedProxyAllowanceAsync(contractAddresses.zrxToken, takerAddress),
-            constants.AWAIT_TRANSACTION_MINED_MS,
+            testConstants.AWAIT_TRANSACTION_MINED_MS,
         );
     });
     afterEach(async () => {
@@ -189,7 +198,7 @@ describe('Coordinator server', () => {
     });
     describe('#/v1/request_transaction', () => {
         before(async () => {
-            app = await getAppAsync(provider);
+            app = await getAppAsync(provider, configs);
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
             const invalidBody = {
@@ -200,7 +209,7 @@ describe('Coordinator server', () => {
                     ),
                     data:
                         '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c5f2b93a6902335d6d05d92895df0a8c381bfc14c342d58df4f926ee938fa1871677f7c000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b1b52aa1994a139883072845a049e4bfda827a5ab435a7f417e37c7bc18663362306d5a9e50f8aa110330987731be51dbfe69a2a0de2c4103da79dbb42b3070b203000000000000000000000000000000000000000000000000000000000000',
-                    verifyingContractAddress: '0x48bacb9266a570d521063ef5dd96e61686dbe788',
+                    verifyingContractAddress: constants.COORDINATOR_CONTRACT_ADDRESS,
                     signature:
                         '0x1cc0b3a07c8bd0346e8ad34278beb28f5b90720ccfde3fe761333971e2b130abd75546534e8d8f0b476c201c573ffeb0c24ed2753ba70e4fe68820075b5eaf1a0003',
                 },
@@ -219,7 +228,7 @@ describe('Coordinator server', () => {
                     signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
                     data:
                         '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c6dfa8c3aeb4634b714b7f4f0b235cf8b77707f0c8d36d1ea8b28b44560c5caa323d855000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b2f1cd06f64e08a71d6cb579a086c356f313ebc2aeeb66a827408aab78439ec7724dfd59fbad7a4c8009f893f724cab90d0f82f45c49f9f76c7e1d7a2c7f2ca4203000000000000000000000000000000000000000000000000000000000000',
-                    verifyingContractAddress: '0x48bacb9266a570d521063ef5dd96e61686dbe788',
+                    verifyingContractAddress: constants.COORDINATOR_CONTRACT_ADDRESS,
                     // Invalid signature
                     signature:
                         '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03',
@@ -295,8 +304,8 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body).to.be.instanceOf(Array);
-            expect(response.body.length).to.be.equal(0);
+            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
             // Check that only the Coordinator order got cancelled in DB
             let isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
@@ -318,8 +327,8 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body).to.be.instanceOf(Array);
-            expect(response.body.length).to.be.equal(0);
+            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
             // Check that orders cancelled in DB
             let isCancelled = await orderModel.isCancelledAsync(orderOne);
@@ -360,8 +369,8 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body).to.be.instanceOf(Array);
-            expect(response.body.length).to.be.equal(0);
+            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
             // Check that order cancelled in DB
             const isCancelled = await orderModel.isCancelledAsync(order);
@@ -409,11 +418,17 @@ describe('Coordinator server', () => {
                 .post('/v1/request_transaction')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body).to.be.instanceOf(Array);
-            expect(response.body.length).to.be.equal(1);
-            expect(response.body[0].signature).to.be.equal(fillResponse.body.signature);
-            expect(response.body[0].expirationTimeSeconds).to.be.equal(fillResponse.body.expirationTimeSeconds);
-            expect(response.body[0].takerAssetFillAmount).to.be.bignumber.equal(takerAssetFillAmount);
+            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingSignatures.length).to.be.equal(1);
+            expect(response.body.outstandingSignatures[0].coordinatorSignature).to.be.equal(
+                fillResponse.body.signature,
+            );
+            expect(response.body.outstandingSignatures[0].expirationTimeSeconds).to.be.equal(
+                fillResponse.body.expirationTimeSeconds,
+            );
+            expect(response.body.outstandingSignatures[0].takerAssetFillAmount).to.be.bignumber.equal(
+                takerAssetFillAmount,
+            );
         });
         it('should return 200 OK if request to fill uncancelled order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -421,9 +436,10 @@ describe('Coordinator server', () => {
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
             const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
             const signedTransaction = createSignedTransaction(data, takerAddress);
+            const txOrigin = takerAddress;
             const body = {
                 signedTransaction,
-                txOrigin: takerAddress,
+                txOrigin,
             };
             const response = await request(app)
                 .post('/v1/request_transaction')
@@ -573,7 +589,7 @@ describe('Coordinator server', () => {
         it('should abort fill request if cancellation received during selective delay', done => {
             // tslint:disable-next-line:no-floating-promises
             (async () => {
-                const selectiveDelayMs = getConfigs().SELECTIVE_DELAY_MS;
+                const selectiveDelayMs = configs.SELECTIVE_DELAY_MS;
                 const selectiveDelayForThisTestMs = 1000;
                 updateSelectiveDelay(selectiveDelayForThisTestMs);
 
@@ -612,8 +628,8 @@ describe('Coordinator server', () => {
                     .post('/v1/request_transaction')
                     .send(cancelBody);
                 expect(response.status).to.be.equal(HttpStatus.OK);
-                expect(response.body).to.be.instanceOf(Array);
-                expect(response.body.length).to.be.equal(0);
+                expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
+                expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
                 updateSelectiveDelay(selectiveDelayMs); // Reset the selective delay at end of test
             })();
@@ -622,7 +638,7 @@ describe('Coordinator server', () => {
     });
     describe(REQUESTS_PATH, () => {
         before(async () => {
-            app = await getAppAsync(provider);
+            app = await getAppAsync(provider, configs);
             app.listen(TEST_PORT, () => {
                 utils.log(`Coordinator SERVER API (HTTP) listening on port ${TEST_PORT}`);
             });
@@ -639,10 +655,10 @@ describe('Coordinator server', () => {
             const clientOnMessagePromises = onMessage(wsClient, messageCount);
 
             // Send fill request
-            const order = await orderFactory.newSignedOrderAsync();
-            const takerAssetFillAmount = order.takerAssetAmount.div(2);
+            const signedOrder = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = signedOrder.takerAssetAmount.div(2);
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
-            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const data = transactionEncoder.fillOrderTx(signedOrder, takerAssetFillAmount);
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const body = {
                 signedTransaction,
@@ -661,12 +677,12 @@ describe('Coordinator server', () => {
             const FillRequestReceivedEventMessage = await clientOnMessagePromises[0];
             const fillRequestReceivedEvent = JSON.parse(FillRequestReceivedEventMessage.data);
             const unsignedTransaction = utils.getUnmarshalledObject(utils.getUnsignedTransaction(signedTransaction));
-            const orderWithoutExchangeAddress = utils.getOrderWithoutExchangeAddress(order);
+            const order = utils.convertToUnsignedOrder(signedOrder);
             const expectedFillRequestReceivedEvent: FillRequestReceivedEvent = {
                 type: EventTypes.FillRequestReceived,
                 data: {
                     functionName: 'fillOrder',
-                    ordersWithoutExchangeAddress: [utils.getUnmarshalledObject(orderWithoutExchangeAddress)],
+                    orders: [utils.getUnmarshalledObject(order)],
                     zeroExTransaction: unsignedTransaction as ZeroExTransaction,
                 },
             };
@@ -685,9 +701,9 @@ describe('Coordinator server', () => {
             const clientOnMessagePromises = onMessage(wsClient, messageCount);
 
             // Send fill request
-            const order = await orderFactory.newSignedOrderAsync();
+            const signedOrder = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
-            const cancelTxData = transactionEncoder.cancelOrderTx(order);
+            const cancelTxData = transactionEncoder.cancelOrderTx(signedOrder);
             const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
             const body = {
                 signedTransaction,
@@ -706,11 +722,11 @@ describe('Coordinator server', () => {
             const cancelRequestAcceptedEventMessage = await clientOnMessagePromises[0];
             const cancelRequestAcceptedEvent = JSON.parse(cancelRequestAcceptedEventMessage.data);
             const unsignedTransaction = utils.getUnmarshalledObject(utils.getUnsignedTransaction(signedTransaction));
-            const orderWithoutExchangeAddress = utils.getOrderWithoutExchangeAddress(order);
+            const order = utils.convertToUnsignedOrder(signedOrder);
             const expectedCancelRequestAcceptedEvent: CancelRequestAccepted = {
                 type: EventTypes.CancelRequestAccepted,
                 data: {
-                    ordersWithoutExchangeAddress: [utils.getUnmarshalledObject(orderWithoutExchangeAddress)],
+                    orders: [utils.getUnmarshalledObject(order)],
                     zeroExTransaction: unsignedTransaction as ZeroExTransaction,
                 },
             };

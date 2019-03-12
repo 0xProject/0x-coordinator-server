@@ -2,19 +2,20 @@ import { ContractWrappers, DecodedCalldata, OrderAndTraderInfo, signatureUtils, 
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { eip712Utils } from '@0x/order-utils';
-import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction } from '@0x/types';
+import { Order, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, signTypedDataUtils } from '@0x/utils';
 import { Provider } from 'ethereum-types';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { getConfigs } from './configs';
+import { constants } from './constants';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
 import {
     BroadcastCallback,
+    Configs,
     CoordinatorApproval,
     EventTypes,
     RequestTransactionErrors,
@@ -45,28 +46,7 @@ export class Handlers {
     private readonly _provider: Provider;
     private readonly _broadcastCallback: BroadcastCallback;
     private readonly _contractWrappers: ContractWrappers;
-    private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): OrderWithoutExchangeAddress[] {
-        switch (decodedCalldata.functionName) {
-            case ExchangeMethods.FillOrder:
-            case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
-            case ExchangeMethods.CancelOrder:
-                return [decodedCalldata.functionArguments.order];
-
-            case ExchangeMethods.BatchFillOrders:
-            case ExchangeMethods.BatchFillOrKillOrders:
-            case ExchangeMethods.BatchFillOrdersNoThrow:
-            case ExchangeMethods.MarketSellOrders:
-            case ExchangeMethods.MarketSellOrdersNoThrow:
-            case ExchangeMethods.MarketBuyOrders:
-            case ExchangeMethods.MarketBuyOrdersNoThrow:
-            case ExchangeMethods.BatchCancelOrders:
-                return decodedCalldata.functionArguments.orders;
-
-            default:
-                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
-        }
-    }
+    private readonly _configs: Configs;
     private static _calculateRemainingFillableTakerAssetAmount(
         signedOrder: SignedOrder,
         orderAndTraderInfo: OrderAndTraderInfo,
@@ -123,43 +103,12 @@ export class Handlers {
         const maxTakerAssetFillAmount = BigNumber.min(...minSet);
         return maxTakerAssetFillAmount;
     }
-    private static async _validateFillsAllowedOrThrowAsync(
-        signedTransaction: SignedZeroExTransaction,
-        coordinatorOrders: OrderWithoutExchangeAddress[],
-        takerAssetFillAmounts: BigNumber[],
-    ): Promise<void> {
-        // Takers can only request to fill an order entirely once. If they do multiple
-        // partial fills, we keep track and make sure they have a sufficient partial fill
-        // amount left for this request to get approved.
-
-        // Core assumption. If signature type is `Wallet`, then takerAddress = walletContractAddress.
-        const takerAddress = signedTransaction.signerAddress;
-        const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
-            coordinatorOrders,
-            takerAddress,
-        );
-        for (let i = 0; i < coordinatorOrders.length; i++) {
-            const coordinatorOrder = coordinatorOrders[i];
-            const orderHash = orderModel.getHash(coordinatorOrder);
-            const takerAssetFillAmount = takerAssetFillAmounts[i];
-            const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
-            const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
-            if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
-                throw new Error(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
-            }
-
-            // If cancelled, reject the request
-            const isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
-            if (isCancelled) {
-                throw new Error(RequestTransactionErrors.OrderCancelled);
-            }
-        }
-    }
-    constructor(provider: Provider, broadcastCallback: BroadcastCallback) {
+    constructor(provider: Provider, configs: Configs, broadcastCallback: BroadcastCallback) {
         this._provider = provider;
         this._broadcastCallback = broadcastCallback;
+        this._configs = configs;
         this._contractWrappers = new ContractWrappers(provider, {
-            networkId: getConfigs().NETWORK_ID,
+            networkId: configs.NETWORK_ID,
         });
     }
     public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
@@ -183,14 +132,16 @@ export class Handlers {
         }
 
         // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
-        let orders: OrderWithoutExchangeAddress[] = [];
+        let orders: Order[] = [];
         try {
-            orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata);
+            orders = this._getOrdersFromDecodedCallData(decodedCalldata);
         } catch (err) {
             res.status(HttpStatus.BAD_REQUEST).send(err.message);
             return;
         }
-        const coordinatorOrders = _.filter(orders, order => utils.isCoordinatorFeeRecipient(order.feeRecipientAddress));
+        const coordinatorOrders = _.filter(orders, order =>
+            utils.isCoordinatorFeeRecipient(order.feeRecipientAddress, this._configs.FEE_RECIPIENT),
+        );
         if (_.isEmpty(coordinatorOrders)) {
             res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
             return;
@@ -240,7 +191,7 @@ export class Handlers {
                     type: EventTypes.FillRequestAccepted,
                     data: {
                         functionName: decodedCalldata.functionName,
-                        ordersWithoutExchangeAddress: coordinatorOrders,
+                        orders: coordinatorOrders,
                         zeroExTransaction: unsignedTransaction,
                         coordinatorSignature: response.body.signature,
                         coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
@@ -262,11 +213,79 @@ export class Handlers {
                 return;
         }
     }
+    private _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata): Order[] {
+        const contractAddresses = getContractAddressesForNetworkOrThrow(this._configs.NETWORK_ID);
+
+        switch (decodedCalldata.functionName) {
+            case ExchangeMethods.FillOrder:
+            case ExchangeMethods.FillOrKillOrder:
+            case ExchangeMethods.FillOrderNoThrow:
+            case ExchangeMethods.CancelOrder:
+                const orderWithoutExchangeAddress = decodedCalldata.functionArguments.order;
+                const order = {
+                    ...orderWithoutExchangeAddress,
+                    exchangeAddress: contractAddresses.exchange,
+                };
+                return [order];
+
+            case ExchangeMethods.BatchFillOrders:
+            case ExchangeMethods.BatchFillOrKillOrders:
+            case ExchangeMethods.BatchFillOrdersNoThrow:
+            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersNoThrow:
+            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersNoThrow:
+            case ExchangeMethods.BatchCancelOrders:
+                const ordersWithoutExchangeAddress = decodedCalldata.functionArguments.orders;
+                const orders = _.map(ordersWithoutExchangeAddress, orderWithoutExchangeAddress => {
+                    return {
+                        ...orderWithoutExchangeAddress,
+                        exchangeAddress: contractAddresses.exchange,
+                    };
+                });
+                return orders;
+
+            default:
+                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
+        }
+    }
+    private async _validateFillsAllowedOrThrowAsync(
+        signedTransaction: SignedZeroExTransaction,
+        coordinatorOrders: Order[],
+        takerAssetFillAmounts: BigNumber[],
+    ): Promise<void> {
+        // Takers can only request to fill an order entirely once. If they do multiple
+        // partial fills, we keep track and make sure they have a sufficient partial fill
+        // amount left for this request to get approved.
+
+        // Core assumption. If signature type is `Wallet`, then takerAddress = walletContractAddress.
+        const takerAddress = signedTransaction.signerAddress;
+        const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
+            coordinatorOrders,
+            takerAddress,
+        );
+        for (let i = 0; i < coordinatorOrders.length; i++) {
+            const coordinatorOrder = coordinatorOrders[i];
+            const orderHash = orderModel.getHash(coordinatorOrder);
+            const takerAssetFillAmount = takerAssetFillAmounts[i];
+            const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
+            const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
+            if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
+                throw new Error(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
+            }
+
+            // If cancelled, reject the request
+            const isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
+            if (isCancelled) {
+                throw new Error(RequestTransactionErrors.OrderCancelled);
+            }
+        }
+    }
     private async _getTakerAssetFillAmountsFromDecodedCallDataAsync(
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
     ): Promise<BigNumber[]> {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
+        const contractAddresses = getContractAddressesForNetworkOrThrow(this._configs.NETWORK_ID);
         let takerAssetFillAmounts: BigNumber[] = [];
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
@@ -359,7 +378,7 @@ export class Handlers {
         return takerAssetFillAmounts;
     }
     private async _handleCancelsAsync(
-        coordinatorOrders: OrderWithoutExchangeAddress[],
+        coordinatorOrders: Order[],
         signedTransaction: SignedZeroExTransaction,
     ): Promise<Response> {
         for (const order of coordinatorOrders) {
@@ -379,30 +398,29 @@ export class Handlers {
         const cancelRequestAccepted = {
             type: EventTypes.CancelRequestAccepted,
             data: {
-                ordersWithoutExchangeAddress: coordinatorOrders,
+                orders: coordinatorOrders,
                 zeroExTransaction: unsignedTransaction,
             },
         };
         this._broadcastCallback(cancelRequestAccepted);
         const outstandingSignatures = await transactionModel.getOutstandingSignaturesByOrdersAsync(coordinatorOrders);
+        const body = {
+            outstandingSignatures,
+        };
         return {
             status: HttpStatus.OK,
-            body: outstandingSignatures,
+            body,
         };
     }
     private async _handleFillsAsync(
         functionName: string,
-        coordinatorOrders: OrderWithoutExchangeAddress[],
+        coordinatorOrders: Order[],
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         takerAssetFillAmounts: BigNumber[],
     ): Promise<Response> {
         try {
-            await Handlers._validateFillsAllowedOrThrowAsync(
-                signedTransaction,
-                coordinatorOrders,
-                takerAssetFillAmounts,
-            );
+            await this._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
         } catch (err) {
             if (_.includes(_.values(RequestTransactionErrors), err.message)) {
                 return {
@@ -418,20 +436,16 @@ export class Handlers {
             type: EventTypes.FillRequestReceived,
             data: {
                 functionName,
-                ordersWithoutExchangeAddress: coordinatorOrders,
+                orders: coordinatorOrders,
                 zeroExTransaction: unsignedTransaction,
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent);
-        await utils.sleepAsync(getConfigs().SELECTIVE_DELAY_MS); // Add selective delay
+        await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Add selective delay
 
         // Check that still a valid fill request after selective delay
         try {
-            await Handlers._validateFillsAllowedOrThrowAsync(
-                signedTransaction,
-                coordinatorOrders,
-                takerAssetFillAmounts,
-            );
+            await this._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
         } catch (err) {
             if (_.includes(_.values(RequestTransactionErrors), err.message)) {
                 return {
@@ -456,12 +470,12 @@ export class Handlers {
     private async _generateAndStoreSignatureAsync(
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
-        orders: OrderWithoutExchangeAddress[],
+        orders: Order[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<RequestTransactionResponse> {
         // generate signature & expiry and add to DB
         const approvalExpirationTimeSeconds =
-            utils.getCurrentTimestampSeconds() + getConfigs().EXPIRATION_DURATION_SECONDS;
+            utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const coordinatorApproval: CoordinatorApproval = {
             txOrigin,
@@ -481,10 +495,12 @@ export class Handlers {
         const normalizedCoordinatorApproval = _.mapValues(coordinatorApproval, value => {
             return !_.isString(value) ? value.toString() : value;
         });
+        // TODO(fabio): Remove this hard-coding on the coordinator address once re-published contract-addresses
+        // package
         // HACK(fabio): Hard-code fake Coordinator address until we've deployed the contract and added
         // the address to `@0x/contract-addresses`
-        const contractAddresses = getContractAddressesForNetworkOrThrow(getConfigs().NETWORK_ID);
-        (contractAddresses as any).coordinator = '0xee0cec63753081f853145bc93a0f2988c9499925';
+        const contractAddresses = getContractAddressesForNetworkOrThrow(this._configs.NETWORK_ID);
+        (contractAddresses as any).coordinator = constants.COORDINATOR_CONTRACT_ADDRESS;
         const domain = {
             name: '0x Protocol Trade Execution Coordinator',
             version: '1.0.0',
@@ -502,7 +518,7 @@ export class Handlers {
         const coordinatorApprovalECSignature = await signatureUtils.ecSignHashAsync(
             this._provider,
             coordinatorApprovalHashHex,
-            getConfigs().FEE_RECIPIENT,
+            this._configs.FEE_RECIPIENT,
         );
 
         // Insert signature into DB

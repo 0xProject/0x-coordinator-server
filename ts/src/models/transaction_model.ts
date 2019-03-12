@@ -1,4 +1,4 @@
-import { OrderWithoutExchangeAddress } from '@0x/types';
+import { Order } from '@0x/types';
 import { BigNumber } from '@0x/utils';
 import * as _ from 'lodash';
 
@@ -21,7 +21,7 @@ export const transactionModel = {
         return transactionIfExists;
     },
     async findByOrdersAsync(
-        orders: OrderWithoutExchangeAddress[],
+        orders: Order[],
         opts?: {
             takerAddress?: string;
             isUnexpired?: boolean;
@@ -55,7 +55,7 @@ export const transactionModel = {
         signature: string,
         expirationTimeSeconds: number,
         takerAddress: string,
-        orders: OrderWithoutExchangeAddress[],
+        orders: Order[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<TransactionEntity> {
         let transactionEntity = new TransactionEntity();
@@ -87,7 +87,7 @@ export const transactionModel = {
         return transactionEntity;
     },
     async getOrderHashToFillAmountRequestedAsync(
-        orders: OrderWithoutExchangeAddress[],
+        orders: Order[],
         takerAddress: string,
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
@@ -113,9 +113,7 @@ export const transactionModel = {
         }
         return orderHashToFillAmount;
     },
-    async getOutstandingSignaturesByOrdersAsync(
-        coordinatorOrders: OrderWithoutExchangeAddress[],
-    ): Promise<OutstandingSignature[]> {
+    async getOutstandingSignaturesByOrdersAsync(coordinatorOrders: Order[]): Promise<OutstandingSignature[]> {
         const coordinatorOrderHashes = _.map(coordinatorOrders, o => orderModel.getHash(o));
         const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders, { isUnexpired: true });
         const outstandingSignatures: OutstandingSignature[] = [];
@@ -132,7 +130,7 @@ export const transactionModel = {
                     }
                     outstandingSignatures.push({
                         orderHash: order.hash,
-                        signature: transaction.signature,
+                        coordinatorSignature: transaction.signature,
                         expirationTimeSeconds: transaction.expirationTimeSeconds,
                         takerAssetFillAmount: fillAmount.takerAssetFillAmount,
                     });

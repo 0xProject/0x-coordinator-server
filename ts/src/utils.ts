@@ -3,7 +3,6 @@ import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, Zero
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
 
-import { getConfigs } from './configs';
 import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
 
 const schemaValidator = new SchemaValidator();
@@ -29,17 +28,16 @@ export const utils = {
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);
     },
-    isCoordinatorFeeRecipient(feeRecipientAddress: string): boolean {
-        return feeRecipientAddress === getConfigs().FEE_RECIPIENT;
+    isCoordinatorFeeRecipient(feeRecipientAddress: string, coordinatorFeeRecipientAddress: string): boolean {
+        return feeRecipientAddress === coordinatorFeeRecipientAddress;
     },
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise<void>(resolve => setTimeout(resolve, miliseconds));
     },
-    getOrderWithoutExchangeAddress(order: SignedOrder): OrderWithoutExchangeAddress {
+    convertToUnsignedOrder(order: SignedOrder): OrderWithoutExchangeAddress {
         const orderWithoutExchangeAddress = {
             ...order,
         };
-        delete orderWithoutExchangeAddress.exchangeAddress;
         delete orderWithoutExchangeAddress.signature;
         return orderWithoutExchangeAddress;
     },
