@@ -25,6 +25,15 @@ export const utils = {
             throw new ValidationError(validationErrorItems);
         }
     },
+    getInvalidFunctionCallError(functionName: string): ValidationError {
+        return new ValidationError([
+            {
+                field: 'signedTransaction.data',
+                code: ValidationErrorCodes.FunctionCallUnsupported,
+                reason: `Function call encoded in 0x transaction data unsupported: ${functionName}`,
+            },
+        ]);
+    },
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);
     },

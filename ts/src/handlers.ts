@@ -16,6 +16,7 @@ import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
 import { constants } from './constants';
+import { ValidationError, ValidationErrorCodes } from './errors';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
@@ -26,7 +27,6 @@ import {
     EventTypes,
     NetworkIdToContractWrappers,
     NetworkIdToProvider,
-    RequestTransactionErrors,
     RequestTransactionResponse,
     Response,
 } from './types';
@@ -146,7 +146,7 @@ export class Handlers {
             }
 
             default:
-                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
+                throw utils.getInvalidFunctionCallError(decodedCalldata.functionName);
         }
     }
     private static async _validateFillsAllowedOrThrowAsync(
@@ -171,13 +171,25 @@ export class Handlers {
             const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
             const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
             if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
-                throw new Error(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
+                throw new ValidationError([
+                    {
+                        field: 'signedTransaction.data',
+                        code: ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
+                        reason: `A taker can only request to fill an order fully once. This request would exceed this amount for order with hash ${orderHash}`,
+                    },
+                ]);
             }
 
             // If cancelled, reject the request
             const isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
             if (isCancelled) {
-                throw new Error(RequestTransactionErrors.OrderCancelled);
+                throw new ValidationError([
+                    {
+                        field: 'signedTransaction.data',
+                        code: ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
+                        reason: `Cannot fill order with hash ${orderHash} because it's already been soft-cancelled`,
+                    },
+                ]);
             }
         }
     }
@@ -202,8 +214,13 @@ export class Handlers {
 
         const supportedNetworkIds = _.map(_.keys(this._networkIdToProvider), networkIdStr => _.parseInt(networkIdStr));
         if (!_.includes(supportedNetworkIds, networkId)) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.NetworkNotSupported);
-            return;
+            throw new ValidationError([
+                {
+                    field: 'networkId',
+                    code: ValidationErrorCodes.UnsupportedOption,
+                    reason: 'Requested networkId not supported by this coordinator',
+                },
+            ]);
         }
 
         // 2. Decode the supplied transaction data
@@ -218,18 +235,18 @@ export class Handlers {
                 .getAbiDecoder()
                 .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
         } catch (err) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.DecodingTransactionFailed);
-            return;
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction.data',
+                    code: ValidationErrorCodes.ZeroExTransactionDecodingFailed,
+                    reason: '0x transaction data decoding failed',
+                },
+            ]);
         }
 
         // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
         let orders: Order[] = [];
-        try {
-            orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata, networkId);
-        } catch (err) {
-            res.status(HttpStatus.BAD_REQUEST).send(err.message);
-            return;
-        }
+        orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata, networkId);
         const coordinatorOrders = _.filter(orders, order =>
             utils.isCoordinatorFeeRecipient(
                 order.feeRecipientAddress,
@@ -237,8 +254,14 @@ export class Handlers {
             ),
         );
         if (_.isEmpty(coordinatorOrders)) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
-            return;
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction.data',
+                    code: ValidationErrorCodes.NoCoordinatorOrdersIncluded,
+                    reason:
+                        '0x transaction data does not include any orders involving this coordinators feeRecipientAddresses',
+                },
+            ]);
         }
 
         // 4. Validate the 0x transaction signature
@@ -251,8 +274,13 @@ export class Handlers {
             signedTransaction.signerAddress,
         );
         if (!isValidSignature) {
-            res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidTransactionSignature);
-            return;
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction.signature',
+                    code: ValidationErrorCodes.InvalidZeroExTransactionSignature,
+                    reason: '0x transaction signature is invalid',
+                },
+            ]);
         }
 
         // 5. Handle the request
@@ -306,8 +334,7 @@ export class Handlers {
             }
 
             default:
-                res.status(HttpStatus.BAD_REQUEST).send(RequestTransactionErrors.InvalidFunctionCall);
-                return;
+                throw utils.getInvalidFunctionCallError(decodedCalldata.functionName);
         }
     }
     private async _getTakerAssetFillAmountsFromDecodedCallDataAsync(
@@ -405,7 +432,7 @@ export class Handlers {
             }
 
             default:
-                throw new Error(RequestTransactionErrors.InvalidFunctionCall);
+                throw utils.getInvalidFunctionCallError(decodedCalldata.functionName);
         }
         return takerAssetFillAmounts;
     }
@@ -415,15 +442,14 @@ export class Handlers {
         networkId: number,
     ): Promise<Response> {
         for (const order of coordinatorOrders) {
-            try {
-                if (signedTransaction.signerAddress !== order.makerAddress) {
-                    throw new Error(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
-                }
-            } catch (err) {
-                return {
-                    status: HttpStatus.BAD_REQUEST,
-                    body: err.message,
-                };
+            if (signedTransaction.signerAddress !== order.makerAddress) {
+                throw new ValidationError([
+                    {
+                        field: 'signedTransaction.data',
+                        code: ValidationErrorCodes.OnlyMakerCanCancelOrders,
+                        reason: 'Cannot cancel order whose maker is not the 0x transaction signerAddress',
+                    },
+                ]);
             }
             await orderModel.cancelAsync(order);
         }
@@ -453,21 +479,7 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<Response> {
-        try {
-            await Handlers._validateFillsAllowedOrThrowAsync(
-                signedTransaction,
-                coordinatorOrders,
-                takerAssetFillAmounts,
-            );
-        } catch (err) {
-            if (_.includes(_.values(RequestTransactionErrors), err.message)) {
-                return {
-                    status: HttpStatus.BAD_REQUEST,
-                    body: err.message,
-                };
-            }
-            throw err;
-        }
+        await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
 
         const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
         const fillRequestReceivedEvent = {
@@ -482,21 +494,7 @@ export class Handlers {
         await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Add selective delay
 
         // Check that still a valid fill request after selective delay
-        try {
-            await Handlers._validateFillsAllowedOrThrowAsync(
-                signedTransaction,
-                coordinatorOrders,
-                takerAssetFillAmounts,
-            );
-        } catch (err) {
-            if (_.includes(_.values(RequestTransactionErrors), err.message)) {
-                return {
-                    status: HttpStatus.BAD_REQUEST,
-                    body: err.message,
-                };
-            }
-            throw err;
-        }
+        await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
 
         const response = await this._generateAndStoreSignatureAsync(
             txOrigin,

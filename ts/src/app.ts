@@ -9,16 +9,11 @@ import * as WebSocket from 'websocket';
 import { assertConfigsAreValid } from './assertions';
 import { constants } from './constants';
 import { hasDBConnection, initDBConnectionAsync } from './db_connection';
+import { GeneralErrorCodes, ValidationErrorCodes } from './errors';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { urlParamsParsing } from './middleware/url_params_parsing';
-import {
-    BroadcastMessage,
-    Configs,
-    NetworkIdToConnectionStore,
-    NetworkIdToProvider,
-    RequestTransactionErrors,
-} from './types';
+import { BroadcastMessage, Configs, NetworkIdToConnectionStore, NetworkIdToProvider } from './types';
 
 const networkIdToConnectionStore: NetworkIdToConnectionStore = {};
 
@@ -69,13 +64,24 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
     wss.on('request', async (request: any) => {
         // If the request isn't to `/v1/requests`, reject
         if (!_.includes(request.resourceURL.path, '/v1/requests')) {
-            request.reject(400, RequestTransactionErrors.IncorrectPathForWsConnection);
+            request.reject(404, 'NOT_FOUND');
             return;
         }
         const networkIdStr = request.resourceURL.query.networkId || constants.DEFAULT_NETWORK_ID;
         const networkId = _.parseInt(networkIdStr);
         if (!_.includes(supportedNetworkIds, networkId)) {
-            request.reject(400, RequestTransactionErrors.NetworkNotSupported);
+            const body = {
+                code: GeneralErrorCodes.ValidationError,
+                reason: 'Validation Failed',
+                validationErrors: [
+                    {
+                        field: 'networkId',
+                        code: ValidationErrorCodes.UnsupportedOption,
+                        reason: 'Requested networkId not supported by this coordinator',
+                    },
+                ],
+            };
+            request.reject(400, body);
             return;
         }
 

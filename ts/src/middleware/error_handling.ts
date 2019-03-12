@@ -1,4 +1,13 @@
 import * as express from 'express';
+import * as HttpStatus from 'http-status-codes';
+
+import {
+    BadRequestError,
+    CoordinatorBaseError,
+    GeneralErrorCodes,
+    generalErrorCodeToReason,
+    ValidationError,
+} from '../errors';
 
 /**
  * Catches errors thrown by our code and serialies them
@@ -16,7 +25,36 @@ export function errorHandler(
         return next(err);
     }
 
-    // TODO: Custom error handling logic goes here.
-
+    if ((err as any).isCoordinatorError) {
+        const relayerError = err as CoordinatorBaseError;
+        if (relayerError.statusCode === HttpStatus.BAD_REQUEST) {
+            const badRequestError = relayerError as BadRequestError;
+            if (badRequestError.generalErrorCode === GeneralErrorCodes.ValidationError) {
+                const validationError = badRequestError as ValidationError;
+                const errorBody = {
+                    code: badRequestError.generalErrorCode,
+                    reason: generalErrorCodeToReason[badRequestError.generalErrorCode],
+                    validationErrors: validationError.validationErrors,
+                };
+                res.status(relayerError.statusCode).send(errorBody);
+                return;
+            } else if (badRequestError.generalErrorCode === GeneralErrorCodes.MalformedJson) {
+                const errorBody = {
+                    code: badRequestError.generalErrorCode,
+                    reason: generalErrorCodeToReason[badRequestError.generalErrorCode],
+                };
+                res.status(relayerError.statusCode).send(errorBody);
+                return;
+            }
+        } else {
+            const errorBody = {
+                reason: HttpStatus.getStatusText(relayerError.statusCode),
+            };
+            res.status(relayerError.statusCode).send(errorBody);
+            return;
+        }
+    } else {
+        return next(err);
+    }
     return next(err);
 }

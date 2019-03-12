@@ -1,7 +1,7 @@
 import * as express from 'express';
 import * as _ from 'lodash';
 
-import { ValidationError } from '../errors';
+import { ValidationError, ValidationErrorCodes } from '../errors';
 
 import { constants } from '../constants';
 
@@ -28,8 +28,8 @@ function parseNetworkId(supportedNetworkIds: number[], networkIdStrIfExists?: st
         if (!_.includes(supportedNetworkIds, networkId)) {
             const validationErrorItem = {
                 field: 'networkId',
-                code: 1004,
-                reason: `Network id ${networkIdStrIfExists} is not supported`,
+                code: ValidationErrorCodes.UnsupportedOption,
+                reason: 'Requested networkId not supported by this coordinator',
             };
             throw new ValidationError([validationErrorItem]);
         }

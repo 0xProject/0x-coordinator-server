@@ -1,5 +1,4 @@
 import { BigNumber, ContractWrappers, ZeroExTransaction } from '0x.js';
-import { ExchangeContract } from '@0x/abi-gen-wrappers';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order } from '@0x/types';
 import * as WebSocket from 'websocket';
@@ -9,21 +8,6 @@ export interface Configs {
     NETWORK_ID_TO_SETTINGS: NetworkIdToNetworkSpecificSettings;
     SELECTIVE_DELAY_MS: number;
     EXPIRATION_DURATION_SECONDS: number;
-}
-
-export enum RequestTransactionErrors {
-    InvalidBody = 'INVALID_BODY',
-    DecodingTransactionFailed = 'DECODING_TRANSACTION_FAILED',
-    CoordinatorFeeRecipientNotFound = 'COORDINATOR_FEE_RECIPIENT_NOT_FOUND',
-    CancellationTransactionNotSignedByMaker = 'CANCELLATION_TRANSACTION_NOT_SIGNED_BY_MAKER',
-    InvalidTransactionSignature = 'INVALID_TRANSACTION_SIGNATURE',
-    InvalidFunctionCall = 'INVALID_FUNCTION_CALL',
-    OrderCancelled = 'ORDER_CANCELLED',
-    FillRequestAlreadyIssued = 'FILL_REQUEST_ALREADY_ISSUED',
-    FillRequestsExceededTakerAssetAmount = 'FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT',
-    DelegatingTransactionSubmissionDisabled = 'DELEGATING_TRANSACTION_SUBMISSION_DISABLED',
-    NetworkNotSupported = 'NETWORK_NOT_SUPPORTED',
-    IncorrectPathForWsConnection = 'INCORRECT_PATH_FOR_WEBSOCKET_CONNECTION',
 }
 
 export interface RequestTransactionResponse {

@@ -31,15 +31,10 @@ import { assertConfigsAreValid } from '../src/assertions';
 import { constants } from '../src/constants';
 import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
+import { GeneralErrorCodes, ValidationErrorCodes } from '../src/errors';
 import { orderModel } from '../src/models/order_model';
 import { transactionModel } from '../src/models/transaction_model';
-import {
-    CancelRequestAccepted,
-    EventTypes,
-    FillRequestReceivedEvent,
-    NetworkSpecificSettings,
-    RequestTransactionErrors,
-} from '../src/types';
+import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, NetworkSpecificSettings } from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
@@ -227,6 +222,9 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.RequiredField);
+            expect(response.body.validationErrors[0].field).to.be.equal('signerAddress');
         });
         it('should return 400 Bad Request if signature is invalid', async () => {
             const invalidBody = {
@@ -247,7 +245,10 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.InvalidTransactionSignature);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.InvalidZeroExTransactionSignature,
+            );
         });
         it('should return 400 INVALID_FEE_RECIPIENT. if transaction sent with order without Coordinators feeRecipientAddress', async () => {
             const order = await orderFactory.newSignedOrderAsync({
@@ -265,7 +266,10 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.CoordinatorFeeRecipientNotFound);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.NoCoordinatorOrdersIncluded,
+            );
         });
         it('should return 400 if transaction cannot be decoded', async () => {
             const invalidData =
@@ -279,7 +283,10 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.DecodingTransactionFailed);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.ZeroExTransactionDecodingFailed,
+            );
         });
         it('should return 400 if batch cancellation transaction not signed by order maker', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -295,7 +302,8 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.OnlyMakerCanCancelOrders);
         });
         it('should return 200 and only cancel Coordinator order if only one order sent in batch cancellation is a Coordinator order', async () => {
             const coordinatorOrder = await orderFactory.newSignedOrderAsync();
@@ -359,7 +367,8 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.CancellationTransactionNotSignedByMaker);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.OnlyMakerCanCancelOrders);
 
             // Verify that order wasn't cancelled
             const isCancelled = await orderModel.isCancelledAsync(order);
@@ -397,7 +406,10 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(fillBody);
             expect(fillResponse.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(fillResponse.text).to.be.equal(RequestTransactionErrors.OrderCancelled);
+            expect(fillResponse.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(fillResponse.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
+            );
         });
         it('should return 200 OK to order cancellation request & return outstandingSignatures', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -438,6 +450,25 @@ describe('Coordinator server', () => {
             expect(response.body.outstandingSignatures[0].takerAssetFillAmount).to.be.bignumber.equal(
                 takerAssetFillAmount,
             );
+        });
+        it('should return 400 if request specifies unsupported networkId', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount.div(2);
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransaction = createSignedTransaction(data, takerAddress);
+            const txOrigin = takerAddress;
+            const body = {
+                signedTransaction,
+                txOrigin,
+            };
+            const response = await request(app)
+                .post('/v1/request_transaction?networkId=999')
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.UnsupportedOption);
+            expect(response.body.validationErrors[0].field).to.be.equal('networkId');
         });
         it('should return 200 OK if request to fill uncancelled order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -591,7 +622,10 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.text).to.be.equal(RequestTransactionErrors.FillRequestsExceededTakerAssetAmount);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
+            );
         });
         // TODO(fabio): Add test for verifying that if two requests sitting on Selective Delay, the second
         // to complete takes into account the changes in fillAmounts requested from the first order.
@@ -619,7 +653,10 @@ describe('Coordinator server', () => {
                     .send(fillBody)
                     .then((fillResponse: request.Response) => {
                         expect(fillResponse.status).to.be.equal(HttpStatus.BAD_REQUEST);
-                        expect(fillResponse.text).to.be.equal(RequestTransactionErrors.OrderCancelled);
+                        expect(fillResponse.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+                        expect(fillResponse.body.validationErrors[0].code).to.be.equal(
+                            ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
+                        );
                         done();
                     });
 
