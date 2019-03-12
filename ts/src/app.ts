@@ -7,13 +7,14 @@ import * as _ from 'lodash';
 import * as WebSocket from 'websocket';
 
 import { assertConfigsAreValid } from './assertions';
+import { constants } from './constants';
 import { hasDBConnection, initDBConnectionAsync } from './db_connection';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { urlParamsParsing } from './middleware/url_params_parsing';
-import { BroadcastMessage, Configs, NetworkIdToProvider } from './types';
+import { BroadcastMessage, Configs, NetworkIdToConnectionStore, NetworkIdToProvider } from './types';
 
-const connectionStore: Set<WebSocket.connection> = new Set();
+const networkIdToConnectionStore: NetworkIdToConnectionStore = {};
 
 /**
  * Creates a new express app/server
@@ -25,7 +26,8 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
         await initDBConnectionAsync();
     }
 
-    const handlers = new Handlers(networkIdToProvider, configs, (event: BroadcastMessage) => {
+    const handlers = new Handlers(networkIdToProvider, configs, (event: BroadcastMessage, networkId: number) => {
+        const connectionStore = networkIdToConnectionStore[networkId] || new Set<WebSocket.connection>();
         connectionStore.forEach((connection: WebSocket.connection) => {
             connection.sendUTF(JSON.stringify(event));
         });
@@ -59,23 +61,26 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
      * WebSocket endpoint for subscribing to transaction request notifications
      */
     wss.on('request', async (request: any) => {
-        console.log('GET REQUEST');
         // If the request isn't to `/v1/requests`, reject
-        if (request.resourceURL.path !== '/v1/requests') {
+        if (!_.includes(request.resourceURL.path, '/v1/requests')) {
             request.reject(400, 'INCORRECT_PATH');
             return;
         }
+        const networkIdStr = request.resourceURL.query.networkId || constants.DEFAULT_NETWORK_ID;
+        const networkId = _.parseInt(networkIdStr);
 
         // We do not do origin checks because we want to let anyone subscribe to this endpoint
         // TODO: Implement additional credentialling here if desired
         const connection: WebSocket.connection = request.accept(null, request.origin);
 
         // Note: We don't handle the `message` event because this is a listen-only endpoint
+        if (networkIdToConnectionStore[networkId] === undefined) {
+            networkIdToConnectionStore[networkId] = new Set<WebSocket.connection>();
+        }
         connection.on('close', () => {
-            connectionStore.delete(connection);
+            networkIdToConnectionStore[networkId].delete(connection);
         });
-        console.log('ADD CONNECTION');
-        connectionStore.add(connection);
+        networkIdToConnectionStore[networkId].add(connection);
     });
 
     return server;

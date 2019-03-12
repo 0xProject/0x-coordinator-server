@@ -288,13 +288,13 @@ export class Handlers {
                         coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
                     },
                 };
-                this._broadcastCallback(fillRequestAcceptedEvent);
+                this._broadcastCallback(fillRequestAcceptedEvent, networkId);
                 return;
             }
 
             case ExchangeMethods.CancelOrder:
             case ExchangeMethods.BatchCancelOrders: {
-                const response = await this._handleCancelsAsync(coordinatorOrders, signedTransaction);
+                const response = await this._handleCancelsAsync(coordinatorOrders, signedTransaction, networkId);
                 res.status(response.status).send(response.body);
                 return;
             }
@@ -406,6 +406,7 @@ export class Handlers {
     private async _handleCancelsAsync(
         coordinatorOrders: Order[],
         signedTransaction: SignedZeroExTransaction,
+        networkId: number,
     ): Promise<Response> {
         for (const order of coordinatorOrders) {
             try {
@@ -428,7 +429,7 @@ export class Handlers {
                 zeroExTransaction: unsignedTransaction,
             },
         };
-        this._broadcastCallback(cancelRequestAccepted);
+        this._broadcastCallback(cancelRequestAccepted, networkId);
         const outstandingSignatures = await transactionModel.getOutstandingSignaturesByOrdersAsync(coordinatorOrders);
         const body = {
             outstandingSignatures,
@@ -471,7 +472,7 @@ export class Handlers {
                 zeroExTransaction: unsignedTransaction,
             },
         };
-        this._broadcastCallback(fillRequestReceivedEvent);
+        this._broadcastCallback(fillRequestReceivedEvent, networkId);
         await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Add selective delay
 
         // Check that still a valid fill request after selective delay

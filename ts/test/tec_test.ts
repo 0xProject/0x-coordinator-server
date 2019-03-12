@@ -80,7 +80,7 @@ let contractWrappers: ContractWrappers;
 // Websocket tests only
 const TEST_PORT = 8361;
 const NETWORK_ID = 50;
-const WS_NOTIFICATION_ENDPOINT_PATH = '/v1/requests';
+const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?networkId=${NETWORK_ID}`;
 const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
 const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
 let wsClient: WebSocket.w3cwebsocket;

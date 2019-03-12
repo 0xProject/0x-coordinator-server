@@ -1,6 +1,7 @@
 import { BigNumber, ContractWrappers, ZeroExTransaction } from '0x.js';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order } from '@0x/types';
+import * as WebSocket from 'websocket';
 
 export interface Configs {
     HTTP_PORT: number;
@@ -79,7 +80,7 @@ export interface OrderHashToFillAmount {
 
 export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEvent | CancelRequestAccepted;
 
-export type BroadcastCallback = (message: BroadcastMessage) => void;
+export type BroadcastCallback = (message: BroadcastMessage, networkId: number) => void;
 
 export interface OutstandingSignature {
     coordinatorSignature: string;
@@ -104,4 +105,8 @@ export interface NetworkIdToProvider {
 
 export interface NetworkIdToContractWrappers {
     [networkId: number]: ContractWrappers;
+}
+
+export interface NetworkIdToConnectionStore {
+    [networkId: number]: Set<WebSocket.connection>;
 }

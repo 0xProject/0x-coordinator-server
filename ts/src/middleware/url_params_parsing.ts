@@ -3,7 +3,7 @@ import * as _ from 'lodash';
 
 import { ValidationError } from '../errors';
 
-const DEFAULT_NETWORK_ID = 1;
+import { constants } from '../constants';
 
 /**
  * Parses URL params and stores them on the request object
@@ -22,7 +22,7 @@ export function urlParamsParsing(
 
 function parseNetworkId(supportedNetworkIds: number[], networkIdStrIfExists?: string): number {
     if (_.isUndefined(networkIdStrIfExists)) {
-        return DEFAULT_NETWORK_ID;
+        return constants.DEFAULT_NETWORK_ID;
     } else {
         const networkId = _.parseInt(networkIdStrIfExists);
         if (!_.includes(supportedNetworkIds, networkId)) {
