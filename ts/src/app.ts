@@ -6,10 +6,11 @@ import * as asyncHandler from 'express-async-handler';
 import * as http from 'http';
 import * as WebSocket from 'websocket';
 
+import { assertConfigsAreValid } from './assertions';
 import { hasDBConnection, initDBConnectionAsync } from './db_connection';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
-import { BroadcastMessage } from './types';
+import { urlParamsParsing } from './middleware/url_params_parsing';
 import { BroadcastMessage, Configs } from './types';
 
 const connectionStore: Set<WebSocket.connection> = new Set();
@@ -19,6 +20,7 @@ const connectionStore: Set<WebSocket.connection> = new Set();
  * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing coordinator approvals
  */
 export async function getAppAsync(provider: Provider, configs: Configs): Promise<http.Server> {
+    assertConfigsAreValid(configs);
     if (!hasDBConnection()) {
         await initDBConnectionAsync();
     }
@@ -31,6 +33,7 @@ export async function getAppAsync(provider: Provider, configs: Configs): Promise
     const app = express();
     app.use(cors());
     app.use(bodyParser.json());
+    app.use(urlParamsParsing.bind(undefined, configs.NETWORK_ID));
 
     /**
      * POST endpoint for requesting signatures for a 0x transaction

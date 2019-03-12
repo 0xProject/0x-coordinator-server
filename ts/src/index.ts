@@ -3,12 +3,12 @@ import '@babel/polyfill';
 import 'reflect-metadata';
 
 import { getAppAsync } from './app';
-import { getConfigs, initConfigs } from './configs';
+import { assertConfigsAreValid } from './assertions';
+import { configs } from './production_configs';
 import { utils } from './utils';
 
 (async () => {
-    initConfigs();
-    const configs = getConfigs();
+    assertConfigsAreValid(configs);
 
     const providerEngine = new Web3ProviderEngine();
     const privateKeyWalletSubprovider = new PrivateKeyWalletSubprovider(configs.FEE_RECIPIENT_PRIVATE_KEY);

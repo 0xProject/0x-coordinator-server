@@ -2,7 +2,7 @@ import { BigNumber, ZeroExTransaction } from '0x.js';
 import { Order } from '@0x/types';
 
 export interface Configs {
-    HTTP_PORT: string;
+    HTTP_PORT: number;
     NETWORK_ID: number;
     RPC_URL: string;
     FEE_RECIPIENT: string;

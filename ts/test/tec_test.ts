@@ -27,22 +27,17 @@ import * as request from 'supertest';
 import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
-import { getConfigs, initConfigs, updateSelectiveDelay } from '../src/configs';
+import { assertConfigsAreValid } from '../src/assertions';
 import { constants } from '../src/constants';
 import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { orderModel } from '../src/models/order_model';
 import { transactionModel } from '../src/models/transaction_model';
-import {
-    CancelRequestAccepted,
-    Configs,
-    EventTypes,
-    FillRequestReceivedEvent,
-    RequestTransactionErrors,
-} from '../src/types';
+import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, RequestTransactionErrors } from '../src/types';
 import { utils } from '../src/utils';
 
 import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
+import { configs } from './test_configs';
 import { TransactionFactory } from './transaction_factory';
 
 chai.config.includeStack = true;
@@ -51,12 +46,13 @@ chai.use(dirtyChai);
 chai.use(chaiAsPromised);
 const expect = chai.expect;
 
+assertConfigsAreValid(configs);
+
 const TESTRPC_PRIVATE_KEYS = _.map(TESTRPC_PRIVATE_KEYS_STRINGS, privateKeyString =>
     ethUtil.toBuffer(privateKeyString),
 );
 const UNLIMITED_ALLOWANCE = new BigNumber(2).pow(256).minus(1);
 
-let configs: Configs;
 let app: http.Server;
 
 let web3Wrapper: Web3Wrapper;
@@ -86,9 +82,6 @@ const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb
 
 describe('Coordinator server', () => {
     before(async () => {
-        initConfigs();
-        configs = getConfigs();
-
         provider = web3Factory.getRpcProvider({
             shouldUseInProcessGanache: true,
             ganacheDatabasePath: './0x_ganache_snapshot',
@@ -591,7 +584,7 @@ describe('Coordinator server', () => {
             (async () => {
                 const selectiveDelayMs = configs.SELECTIVE_DELAY_MS;
                 const selectiveDelayForThisTestMs = 1000;
-                updateSelectiveDelay(selectiveDelayForThisTestMs);
+                configs.SELECTIVE_DELAY_MS = selectiveDelayForThisTestMs;
 
                 // Do fill request async
                 const order = await orderFactory.newSignedOrderAsync();
@@ -631,7 +624,7 @@ describe('Coordinator server', () => {
                 expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
                 expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
-                updateSelectiveDelay(selectiveDelayMs); // Reset the selective delay at end of test
+                configs.SELECTIVE_DELAY_MS = selectiveDelayMs; // Reset the selective delay at end of test
             })();
         });
         // TODO(fabio): Add test filling an order with a Wallet contract.
