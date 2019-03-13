@@ -27,12 +27,7 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
         await initDBConnectionAsync();
     }
 
-    const handlers = new Handlers(networkIdToProvider, configs, (event: BroadcastMessage, networkId: number) => {
-        const connectionStore = networkIdToConnectionStore[networkId] || new Set<WebSocket.connection>();
-        connectionStore.forEach((connection: WebSocket.connection) => {
-            connection.sendUTF(JSON.stringify(event));
-        });
-    });
+    const handlers = new Handlers(networkIdToProvider, configs, broadcastCallback);
     const app = express();
     app.use(cors());
     app.use(bodyParser.json());
@@ -100,4 +95,11 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
     });
 
     return server;
+}
+
+function broadcastCallback(event: BroadcastMessage, networkId: number): void {
+    const connectionStore = networkIdToConnectionStore[networkId] || new Set<WebSocket.connection>();
+    connectionStore.forEach((connection: WebSocket.connection) => {
+        connection.sendUTF(JSON.stringify(event));
+    });
 }
