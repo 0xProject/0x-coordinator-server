@@ -56,6 +56,7 @@ export class Handlers {
     private readonly _broadcastCallback: BroadcastCallback;
     private readonly _networkIdToContractWrappers: NetworkIdToContractWrappers;
     private readonly _configs: Configs;
+    // TODO(fabio): Move this method into @0x/order-utils package
     private static _calculateRemainingFillableTakerAssetAmount(
         signedOrder: SignedOrder,
         orderAndTraderInfo: OrderAndTraderInfo,
