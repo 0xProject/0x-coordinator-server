@@ -345,7 +345,6 @@ export class Handlers {
             case ExchangeMethods.BatchFillOrders:
             case ExchangeMethods.BatchFillOrKillOrders:
             case ExchangeMethods.BatchFillOrdersNoThrow:
-                // takerAssetFillAmounts
                 takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
                 break;
 
@@ -454,12 +453,11 @@ export class Handlers {
         };
         this._broadcastCallback(cancelRequestAccepted, networkId);
         const outstandingSignatures = await transactionModel.getOutstandingSignaturesByOrdersAsync(coordinatorOrders);
-        const body = {
-            outstandingSignatures,
-        };
         return {
             status: HttpStatus.OK,
-            body,
+            body: {
+                outstandingSignatures,
+            },
         };
     }
     private async _handleFillsAsync(
@@ -482,7 +480,7 @@ export class Handlers {
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent, networkId);
-        await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Add selective delay
+        await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Await selective delay
 
         // Check that still a valid fill request after selective delay
         await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
@@ -585,7 +583,7 @@ export class Handlers {
         // Insert signature into DB
         await transactionModel.createAsync(
             signatures,
-            approvalExpirationTimeSeconds, // All expirations are the same within a single request
+            approvalExpirationTimeSeconds,
             signedTransaction.signerAddress,
             coordinatorOrders,
             takerAssetFillAmounts,
