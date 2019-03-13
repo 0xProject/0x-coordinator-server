@@ -4,7 +4,7 @@ import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
 
 import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
-import { FeeRecipient } from './types';
+import { Configs, FeeRecipient } from './types';
 
 const schemaValidator = new SchemaValidator();
 
@@ -34,6 +34,12 @@ export const utils = {
                 reason: `Function call encoded in 0x transaction data unsupported: ${functionName}`,
             },
         ]);
+    },
+    getSupportedNetworkIds(configs: Configs): number[] {
+        const supportedNetworkIds = _.map(_.keys(configs.NETWORK_ID_TO_SETTINGS), networkIdStr =>
+            _.parseInt(networkIdStr),
+        );
+        return supportedNetworkIds;
     },
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);

@@ -213,7 +213,7 @@ export class Handlers {
         const txOrigin = req.body.txOrigin;
         const networkId = req.networkId;
 
-        const supportedNetworkIds = _.map(_.keys(this._networkIdToProvider), networkIdStr => _.parseInt(networkIdStr));
+        const supportedNetworkIds = utils.getSupportedNetworkIds(this._configs);
         if (!_.includes(supportedNetworkIds, networkId)) {
             throw new ValidationError([
                 {

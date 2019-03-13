@@ -14,6 +14,7 @@ import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { urlParamsParsing } from './middleware/url_params_parsing';
 import { BroadcastMessage, Configs, NetworkIdToConnectionStore, NetworkIdToProvider } from './types';
+import { utils } from './utils';
 
 const networkIdToConnectionStore: NetworkIdToConnectionStore = {};
 
@@ -31,7 +32,7 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
     const app = express();
     app.use(cors());
     app.use(bodyParser.json());
-    const supportedNetworkIds = _.map(_.keys(configs.NETWORK_ID_TO_SETTINGS), networkIdStr => _.parseInt(networkIdStr));
+    const supportedNetworkIds = utils.getSupportedNetworkIds(configs);
     app.use(urlParamsParsing.bind(undefined, supportedNetworkIds));
 
     /**
