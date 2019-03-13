@@ -3,7 +3,7 @@ import { BigNumber } from '0x.js';
 import { assert } from '@0x/assert';
 import * as _ from 'lodash';
 
-import { Configs } from './types';
+import { Configs, FeeRecipient, NetworkSpecificSettings } from './types';
 
 enum EnvVarType {
     Port,
@@ -22,9 +22,11 @@ export function assertConfigsAreValid(configs: Configs): void {
     const networkIds = _.keys(configs.NETWORK_ID_TO_SETTINGS);
     _.each(networkIds, networkId => assert.isNumber('networkId', _.parseInt(networkId)));
     const networkSpecificSettings = _.values(configs.NETWORK_ID_TO_SETTINGS);
-    _.each(networkSpecificSettings, settings => {
-        assert.isETHAddressHex('settings.FEE_RECIPIENT_ADDRESS', settings.FEE_RECIPIENT_ADDRESS);
-        assert.isString('settings.FEE_RECIPIENT_PRIVATE_KEY', settings.FEE_RECIPIENT_PRIVATE_KEY);
+    _.each(networkSpecificSettings, (settings: NetworkSpecificSettings) => {
+        _.each(settings.FEE_RECIPIENTS, (feeRecipient: FeeRecipient, i: number) => {
+            assert.isETHAddressHex(`settings.FEE_RECIPIENTS[${i}].ADDRESS`, feeRecipient.ADDRESS);
+            assert.isString(`settings.FEE_RECIPIENTS[${i}].PRIVATE_KEY`, feeRecipient.PRIVATE_KEY);
+        });
         assert.isUri('settings.RPC_URL', settings.RPC_URL);
     });
 }

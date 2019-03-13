@@ -25,7 +25,7 @@ export class TransactionEntity {
     public takerAddress!: string;
 
     @Column()
-    public signature!: string;
+    public signatures!: string;
 
     @Column()
     public expirationTimeSeconds!: number;

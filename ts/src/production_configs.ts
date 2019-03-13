@@ -6,8 +6,12 @@ export const configs = {
     // Ethereum RPC url
     NETWORK_ID_TO_SETTINGS: {
         1: {
-            FEE_RECIPIENT_ADDRESS: constants.PLACEHOLDER,
-            FEE_RECIPIENT_PRIVATE_KEY: constants.PLACEHOLDER,
+            FEE_RECIPIENTS: [
+                {
+                    ADDRESS: constants.PLACEHOLDER,
+                    PRIVATE_KEY: constants.PLACEHOLDER,
+                },
+            ],
             RPC_URL: 'https://mainnet.infura.io/v3/e2c067d9717e492091d1f1d7a2ec55aa',
         },
     },

@@ -4,6 +4,7 @@ import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
 
 import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
+import { FeeRecipient } from './types';
 
 const schemaValidator = new SchemaValidator();
 
@@ -37,8 +38,9 @@ export const utils = {
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);
     },
-    isCoordinatorFeeRecipient(feeRecipientAddress: string, coordinatorFeeRecipientAddress: string): boolean {
-        return feeRecipientAddress === coordinatorFeeRecipientAddress;
+    isCoordinatorFeeRecipient(feeRecipientAddress: string, coordinatorFeeRecipients: FeeRecipient[]): boolean {
+        const coordinatorFeeRecipientAddresses = _.map(coordinatorFeeRecipients, feeRecipient => feeRecipient.ADDRESS);
+        return _.includes(coordinatorFeeRecipientAddresses, feeRecipientAddress);
     },
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise<void>(resolve => setTimeout(resolve, miliseconds));

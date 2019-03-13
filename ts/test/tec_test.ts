@@ -37,7 +37,7 @@ import { transactionModel } from '../src/models/transaction_model';
 import { CancelRequestAccepted, EventTypes, FillRequestReceivedEvent, NetworkSpecificSettings } from '../src/types';
 import { utils } from '../src/utils';
 
-import { TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
+import { FEE_RECIPIENT_ADDRESS_ONE, FEE_RECIPIENT_ADDRESS_TWO, TESTRPC_PRIVATE_KEYS_STRINGS } from './constants';
 import { configs } from './test_configs';
 import { TransactionFactory } from './transaction_factory';
 
@@ -108,7 +108,7 @@ describe('Coordinator server', () => {
             senderAddress,
             exchangeAddress: contractAddresses.exchange,
             makerAddress,
-            feeRecipientAddress: settings.FEE_RECIPIENT_ADDRESS,
+            feeRecipientAddress: settings.FEE_RECIPIENTS[0].ADDRESS,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
         };
@@ -441,8 +441,8 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
             expect(response.body.outstandingSignatures.length).to.be.equal(1);
-            expect(response.body.outstandingSignatures[0].coordinatorSignature).to.be.equal(
-                fillResponse.body.signature,
+            expect(response.body.outstandingSignatures[0].coordinatorSignatures[0]).to.be.equal(
+                fillResponse.body.signatures[0],
             );
             expect(response.body.outstandingSignatures[0].expirationTimeSeconds).to.be.equal(
                 fillResponse.body.expirationTimeSeconds,
@@ -470,6 +470,52 @@ describe('Coordinator server', () => {
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.UnsupportedOption);
             expect(response.body.validationErrors[0].field).to.be.equal('networkId');
         });
+        it('should return 200 OK if request to batchFill 2 orders each with a different, supported feeRecipientAddress', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync({
+                feeRecipientAddress: FEE_RECIPIENT_ADDRESS_ONE,
+            });
+            const orderTwo = await orderFactory.newSignedOrderAsync({
+                feeRecipientAddress: FEE_RECIPIENT_ADDRESS_TWO,
+            });
+            const takerAssetFillAmountOne = orderOne.takerAssetAmount;
+            const takerAssetFillAmountTwo = orderTwo.takerAssetAmount;
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.batchFillOrdersTx(
+                [orderOne, orderTwo],
+                [takerAssetFillAmountOne, takerAssetFillAmountTwo],
+            );
+            const signedTransaction = createSignedTransaction(data, takerAddress);
+            const txOrigin = takerAddress;
+            const body = {
+                signedTransaction,
+                txOrigin,
+            };
+            const response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(2);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            // Check that fill request was added to DB
+            const transactionEntityIfExists = await transactionModel.findAsync(
+                takerAddress,
+                JSON.stringify(response.body.signatures),
+            );
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
+                response.body.expirationTimeSeconds,
+            );
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
+            expect(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
+            ).to.be.bignumber.equal(takerAssetFillAmountOne);
+            expect(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[1].takerAssetFillAmount,
+            ).to.be.bignumber.equal(takerAssetFillAmountTwo);
+        });
         it('should return 200 OK if request to fill uncancelled order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
@@ -485,12 +531,16 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signature).to.not.be.undefined();
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
-            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            const transactionEntityIfExists = await transactionModel.findAsync(
+                takerAddress,
+                JSON.stringify(response.body.signatures),
+            );
             expect(transactionEntityIfExists).to.not.be.undefined();
             expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
                 response.body.expirationTimeSeconds,
@@ -520,12 +570,16 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signature).to.not.be.undefined();
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
-            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            const transactionEntityIfExists = await transactionModel.findAsync(
+                takerAddress,
+                JSON.stringify(response.body.signatures),
+            );
             expect(transactionEntityIfExists).to.not.be.undefined();
             expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
                 response.body.expirationTimeSeconds,
@@ -565,12 +619,16 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signature).to.not.be.undefined();
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
-            const transactionEntityIfExists = await transactionModel.findAsync(takerAddress, response.body.signature);
+            const transactionEntityIfExists = await transactionModel.findAsync(
+                takerAddress,
+                JSON.stringify(response.body.signatures),
+            );
             expect(transactionEntityIfExists).to.not.be.undefined();
             expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
                 response.body.expirationTimeSeconds,
@@ -614,7 +672,8 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signature).to.not.be.undefined();
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
@@ -743,7 +802,8 @@ describe('Coordinator server', () => {
             const FillRequestAcceptedEventMessage = await clientOnMessagePromises[1];
             const fillRequestAcceptedEvent = JSON.parse(FillRequestAcceptedEventMessage.data);
             expect(fillRequestAcceptedEvent.type).to.be.equal(EventTypes.FillRequestAccepted);
-            expect(fillRequestAcceptedEvent.data.coordinatorSignature).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.coordinatorSignatures).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.coordinatorSignatures.length).to.be.equal(1);
             expect(fillRequestAcceptedEvent.data.coordinatorSignatureExpiration).to.not.be.undefined();
         });
         it('should emit WS event when valid cancel request accepted', async () => {

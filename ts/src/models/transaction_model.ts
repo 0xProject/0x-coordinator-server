@@ -12,11 +12,11 @@ import { OrderHashToFillAmount, OutstandingSignature } from '../types';
 import { orderModel } from './order_model';
 
 export const transactionModel = {
-    async findAsync(takerAddress: string, signature: string): Promise<TransactionEntity | undefined> {
+    async findAsync(takerAddress: string, signatures: string): Promise<TransactionEntity | undefined> {
         const connection = getDBConnection();
         const transactionIfExists = await connection.manager.findOne(TransactionEntity, {
             takerAddress,
-            signature,
+            signatures,
         });
         return transactionIfExists;
     },
@@ -52,14 +52,16 @@ export const transactionModel = {
         return transactionsIfExists;
     },
     async createAsync(
-        signature: string,
+        signatures: string[],
         expirationTimeSeconds: number,
         takerAddress: string,
         orders: Order[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<TransactionEntity> {
         let transactionEntity = new TransactionEntity();
-        transactionEntity.signature = signature;
+        // We store the signatures as a JSON array of signatures since we don't expect to ever query by
+        // a specific signature
+        transactionEntity.signatures = JSON.stringify(signatures);
         transactionEntity.expirationTimeSeconds = expirationTimeSeconds;
         transactionEntity.takerAddress = takerAddress;
 
@@ -130,7 +132,7 @@ export const transactionModel = {
                     }
                     outstandingSignatures.push({
                         orderHash: order.hash,
-                        coordinatorSignature: transaction.signature,
+                        coordinatorSignatures: JSON.parse(transaction.signatures),
                         expirationTimeSeconds: transaction.expirationTimeSeconds,
                         takerAssetFillAmount: fillAmount.takerAssetFillAmount,
                     });

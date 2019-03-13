@@ -11,7 +11,7 @@ export interface Configs {
 }
 
 export interface RequestTransactionResponse {
-    signature: string;
+    signatures: string[];
     expirationTimeSeconds: number;
 }
 
@@ -48,7 +48,7 @@ export interface FillRequestAcceptedEvent {
         functionName: string;
         orders: Order[];
         zeroExTransaction: ZeroExTransaction;
-        coordinatorSignature: string;
+        coordinatorSignatures: string[];
         coordinatorSignatureExpiration: number;
     };
 }
@@ -70,15 +70,19 @@ export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEve
 export type BroadcastCallback = (message: BroadcastMessage, networkId: number) => void;
 
 export interface OutstandingSignature {
-    coordinatorSignature: string;
+    coordinatorSignatures: string[];
     expirationTimeSeconds: number;
     orderHash: string;
     takerAssetFillAmount: BigNumber;
 }
 
+export interface FeeRecipient {
+    ADDRESS: string;
+    PRIVATE_KEY: string;
+}
+
 export interface NetworkSpecificSettings {
-    FEE_RECIPIENT_ADDRESS: string;
-    FEE_RECIPIENT_PRIVATE_KEY: string;
+    FEE_RECIPIENTS: FeeRecipient[];
     RPC_URL: string;
 }
 

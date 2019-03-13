@@ -1,4 +1,4 @@
-import { PrivateKeyWalletSubprovider, RPCSubprovider, Web3ProviderEngine } from '@0x/subproviders';
+import { RPCSubprovider, Web3ProviderEngine } from '@0x/subproviders';
 import '@babel/polyfill';
 import * as _ from 'lodash';
 import 'reflect-metadata';
@@ -15,8 +15,6 @@ import { utils } from './utils';
     const networkIdToProvider: NetworkIdToProvider = {};
     _.each(configs.NETWORK_ID_TO_SETTINGS, (settings: NetworkSpecificSettings, networkIdStr: string) => {
         const providerEngine = new Web3ProviderEngine();
-        const privateKeyWalletSubprovider = new PrivateKeyWalletSubprovider(settings.FEE_RECIPIENT_PRIVATE_KEY);
-        providerEngine.addProvider(privateKeyWalletSubprovider);
         const rpcSubprovider = new RPCSubprovider(settings.RPC_URL);
         providerEngine.addProvider(rpcSubprovider);
         // HACK(fabio): Starting the provider this way avoids it's unused block poller from running

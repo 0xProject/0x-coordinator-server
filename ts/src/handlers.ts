@@ -11,6 +11,7 @@ import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { eip712Utils } from '@0x/order-utils';
 import { Order, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, signTypedDataUtils } from '@0x/utils';
+import * as ethUtil from 'ethereumjs-util';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
@@ -250,7 +251,7 @@ export class Handlers {
         const coordinatorOrders = _.filter(orders, order =>
             utils.isCoordinatorFeeRecipient(
                 order.feeRecipientAddress,
-                this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENT_ADDRESS,
+                this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS,
             ),
         );
         if (_.isEmpty(coordinatorOrders)) {
@@ -318,7 +319,7 @@ export class Handlers {
                         functionName: decodedCalldata.functionName,
                         orders: coordinatorOrders,
                         zeroExTransaction: unsignedTransaction,
-                        coordinatorSignature: response.body.signature,
+                        coordinatorSignatures: response.body.signatures,
                         coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
                     },
                 };
@@ -511,7 +512,7 @@ export class Handlers {
     private async _generateAndStoreSignatureAsync(
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
-        orders: Order[],
+        coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<RequestTransactionResponse> {
@@ -557,24 +558,51 @@ export class Handlers {
         const coordinatorApprovalHashBuff = signTypedDataUtils.generateTypedDataHash(typedData);
         const coordinatorApprovalHashHex = `0x${coordinatorApprovalHashBuff.toString('hex')}`;
 
-        const provider = this._networkIdToProvider[networkId];
-        const coordinatorApprovalECSignature = await signatureUtils.ecSignHashAsync(
-            provider,
-            coordinatorApprovalHashHex,
-            this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENT_ADDRESS,
-        );
+        // Since a coordinator can have multiple feeRecipientAddresses,
+        // we need to make sure we issue a signature for each feeRecipientAddress
+        // found in the orders submitted (i.e., someone can batch fill two coordinator
+        // orders, each with a different feeRecipientAddress). In that case, we issue a
+        // signature/expiration for each feeRecipientAddress
+        const feeRecipientAddressSet = new Set<string>();
+        _.each(coordinatorOrders, o => {
+            feeRecipientAddressSet.add(o.feeRecipientAddress);
+        });
+        const signatures = [];
+        const feeRecipientAddressesUsed = Array.from(feeRecipientAddressSet);
+        for (const feeRecipientAddress of feeRecipientAddressesUsed) {
+            const feeRecipientIfExists = _.find(
+                this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS,
+                f => f.ADDRESS === feeRecipientAddress,
+            );
+            if (feeRecipientIfExists === undefined) {
+                throw new Error(
+                    `Unexpected error: Found feeRecipientAddress ${feeRecipientAddress} that wasn't specified in config.`,
+                );
+            }
+            const signature = ethUtil.ecsign(
+                ethUtil.toBuffer(coordinatorApprovalHashHex),
+                Buffer.from(feeRecipientIfExists.PRIVATE_KEY, 'hex'),
+            );
+            const ecSignature = {
+                v: signature.v,
+                s: signature.s.toString(),
+                r: signature.r.toString(),
+            };
+            const approvalSignature = signatureUtils.convertECSignatureToSignatureHex(ecSignature);
+            signatures.push(approvalSignature);
+        }
 
         // Insert signature into DB
         await transactionModel.createAsync(
-            coordinatorApprovalECSignature,
-            approvalExpirationTimeSeconds,
+            signatures,
+            approvalExpirationTimeSeconds, // All expirations are the same within a single request
             signedTransaction.signerAddress,
-            orders,
+            coordinatorOrders,
             takerAssetFillAmounts,
         );
 
         return {
-            signature: coordinatorApprovalECSignature,
+            signatures,
             expirationTimeSeconds: approvalExpirationTimeSeconds,
         };
     }
