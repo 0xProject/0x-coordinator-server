@@ -26,12 +26,6 @@ import { utils } from './utils';
     const app = await getAppAsync(networkIdToProvider, configs);
 
     app.listen(configs.HTTP_PORT, () => {
-        utils.log(
-            `Coordinator SERVER API (HTTP) listening on port ${configs.HTTP_PORT}!\nConfig: ${JSON.stringify(
-                configs,
-                null,
-                2,
-            )}`,
-        );
+        utils.log(`Coordinator SERVER API (HTTP) listening on port ${configs.HTTP_PORT}!`);
     });
 })().catch(utils.log);

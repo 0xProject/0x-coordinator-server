@@ -8,7 +8,7 @@
         "build": "tsc -p ts/tsconfig.json",
         "watch": "tsc -w -p ts/tsconfig.json",
         "prettier": "prettier --write 'ts/**/*.ts' --config .prettierrc",
-        "start": "node -r dotenv/config ts/lib/index.js",
+        "start": "node ts/lib/src/index.js",
         "lint": "tslint --project ts --format stylish --exclude ts/src/schemas/**/*",
         "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 6000 --exit",
         "update_snapshot": "cross-env download --extract --strip 1 --out 0x_ganache_snapshot ${npm_package_config_snapshot_url}",
@@ -16,9 +16,11 @@
     },
     "config": {
         "mnemonic": "concert load couple harbor equip island argue ramp clarify fence smart topic",
-        "snapshot_url": "http://ganache-snapshots.0x.org.s3.amazonaws.com/0x_ganache_snapshot-2.4.0.zip"
+        "snapshot_url": "http://ganache-snapshots.0x.org.s3.amazonaws.com/0x_ganache_snapshot-4.0.3.zip"
     },
     "devDependencies": {
+        "@0x/abi-gen-wrappers": "^4.1.0",
+        "@0x/contract-artifacts": "^1.4.0",
         "@0x/contracts-test-utils": "^3.0.4",
         "@0x/dev-utils": "^2.1.0",
         "@0x/tslint-config": "^3.0.0",
