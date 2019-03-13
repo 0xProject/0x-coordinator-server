@@ -76,10 +76,11 @@ let contractWrappers: ContractWrappers;
 const TEST_PORT = 8361;
 const NETWORK_ID = 50;
 const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?networkId=${NETWORK_ID}`;
-const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
-const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
 let wsClient: WebSocket.w3cwebsocket;
 
+// Shared
+const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
+const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
@@ -97,12 +98,10 @@ describe('Coordinator server', () => {
 
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
-        [owner, senderAddress, makerAddress, takerAddress, coordinatorSignerAddress] = _.slice(accounts, 0, 6);
-        coordinatorSignerAddress = coordinatorSignerAddress; // TODO(fabio): Remove later, once we use coordinatorSignerAddress
+        [owner, senderAddress, makerAddress, takerAddress] = _.slice(accounts, 0, 6);
 
         contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
-        // HACK(fabio): Had to cast to any to get rid of a TS error related to index signatures. To fix.
-        const settings: NetworkSpecificSettings = (configs.NETWORK_ID_TO_SETTINGS as any)[NETWORK_ID];
+        const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
         const defaultOrderParams = {
             ...testConstants.STATIC_ORDER_PARAMS,
             senderAddress,

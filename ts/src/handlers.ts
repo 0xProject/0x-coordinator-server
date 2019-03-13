@@ -238,12 +238,14 @@ export class Handlers {
         // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
         let orders: Order[] = [];
         orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata, networkId);
-        const coordinatorOrders = _.filter(orders, order =>
-            utils.isCoordinatorFeeRecipient(
-                order.feeRecipientAddress,
-                this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS,
-            ),
-        );
+        const coordinatorOrders = _.filter(orders, order => {
+            const coordinatorFeeRecipients = this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS;
+            const coordinatorFeeRecipientAddresses = _.map(
+                coordinatorFeeRecipients,
+                feeRecipient => feeRecipient.ADDRESS,
+            );
+            return _.includes(coordinatorFeeRecipientAddresses, order.feeRecipientAddress);
+        });
         if (_.isEmpty(coordinatorOrders)) {
             throw new ValidationError([
                 {

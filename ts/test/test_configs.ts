@@ -3,7 +3,6 @@ import { FEE_RECIPIENT_ADDRESS_ONE, FEE_RECIPIENT_ADDRESS_TWO } from './constant
 export const configs = {
     // Network port to listen on
     HTTP_PORT: 3000,
-    // Ethereum RPC url
     // The fee recipient details used by the coordinator's relayer for a particular network
     NETWORK_ID_TO_SETTINGS: {
         50: {
@@ -17,6 +16,7 @@ export const configs = {
                     PRIVATE_KEY: 'efb595a0178eb79a8df953f87c5148402a224cdf725e88c0146727c6aceadccd',
                 },
             ],
+            // Ethereum RPC url
             RPC_URL: 'https://mainnet.infura.io/v3/e2c067d9717e492091d1f1d7a2ec55aa',
         },
     },
