@@ -8,10 +8,7 @@ import { Configs, FeeRecipient, NetworkSpecificSettings } from './types';
 enum EnvVarType {
     Port,
     Integer,
-    FeeRecipient,
-    FeeRecipientPrivateKey,
     UnitAmount,
-    Url,
 }
 
 /**
