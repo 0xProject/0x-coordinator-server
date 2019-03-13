@@ -42,6 +42,9 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
 
     app.use(errorHandler);
 
+    /**
+     * Create WebSocket server for broadcasting coordinator notifications
+     */
     const server = http.createServer(app);
     const wss = new WebSocket.server({
         httpServer: server,
@@ -58,12 +61,12 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
      * WebSocket endpoint for subscribing to transaction request notifications
      */
     wss.on('request', async (request: any) => {
-        // If the request isn't to `/v1/requests`, reject
+        // If the request isn't to the expected endpoint, reject
         if (!_.includes(request.resourceURL.path, '/v1/requests')) {
             request.reject(404, 'NOT_FOUND');
             return;
         }
-        const networkIdStr = request.resourceURL.query.networkId || constants.DEFAULT_NETWORK_ID;
+        const networkIdStr = request.resourceURL.query.networkId || constants.DEFAULT_NETWORK_ID.toString();
         const networkId = _.parseInt(networkIdStr);
         if (!_.includes(supportedNetworkIds, networkId)) {
             const body = {
@@ -82,17 +85,17 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
         }
 
         // We do not do origin checks because we want to let anyone subscribe to this endpoint
-        // TODO: Implement additional credentialling here if desired
+        // COORDINATOR_OPERATOR: Implement additional credentialling here if desired
         const connection: WebSocket.connection = request.accept(null, request.origin);
 
-        // Note: We don't handle the `message` event because this is a listen-only endpoint
+        // Note: We don't handle the `message` event because this is a broadcast-only endpoint
         if (networkIdToConnectionStore[networkId] === undefined) {
             networkIdToConnectionStore[networkId] = new Set<WebSocket.connection>();
         }
+        networkIdToConnectionStore[networkId].add(connection);
         connection.on('close', () => {
             networkIdToConnectionStore[networkId].delete(connection);
         });
-        networkIdToConnectionStore[networkId].add(connection);
     });
 
     return server;
