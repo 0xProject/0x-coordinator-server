@@ -214,17 +214,6 @@ export class Handlers {
         const txOrigin = req.body.txOrigin;
         const networkId = req.networkId;
 
-        const supportedNetworkIds = utils.getSupportedNetworkIds(this._configs);
-        if (!_.includes(supportedNetworkIds, networkId)) {
-            throw new ValidationError([
-                {
-                    field: 'networkId',
-                    code: ValidationErrorCodes.UnsupportedOption,
-                    reason: 'Requested networkId not supported by this coordinator',
-                },
-            ]);
-        }
-
         // 2. Decode the supplied transaction data
         const signedTransaction: SignedZeroExTransaction = {
             ...req.body.signedTransaction,
