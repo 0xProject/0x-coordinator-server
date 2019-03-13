@@ -1,9 +1,8 @@
 import * as express from 'express';
 import * as _ from 'lodash';
 
-import { ValidationError, ValidationErrorCodes } from '../errors';
-
 import { constants } from '../constants';
+import { ValidationError, ValidationErrorCodes } from '../errors';
 
 /**
  * Parses URL params and stores them on the request object

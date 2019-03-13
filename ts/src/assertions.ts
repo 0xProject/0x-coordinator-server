@@ -14,6 +14,10 @@ enum EnvVarType {
     Url,
 }
 
+/**
+ * Assert that the configs supplied are valid
+ * @param configs Configs
+ */
 export function assertConfigsAreValid(configs: Configs): void {
     assertEnvVarType('HTTP_PORT', configs.HTTP_PORT, EnvVarType.Port);
     assertEnvVarType('SELECTIVE_DELAY_MS', configs.SELECTIVE_DELAY_MS, EnvVarType.Integer);
