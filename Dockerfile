@@ -16,4 +16,4 @@ COPY . .
 RUN yarn build
 
 EXPOSE 3000
-CMD [ "forever", "ts/lib/index.js" ]
+CMD [ "forever", "ts/lib/src/index.js" ]
