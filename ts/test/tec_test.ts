@@ -686,8 +686,6 @@ describe('Coordinator server', () => {
                 ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
             );
         });
-        // TODO(fabio): Add test for verifying that if two requests sitting on Selective Delay, the second
-        // to complete takes into account the changes in fillAmounts requested from the first order.
         it('should abort fill request if cancellation received during selective delay', done => {
             // tslint:disable-next-line:no-floating-promises
             (async () => {
@@ -739,7 +737,6 @@ describe('Coordinator server', () => {
                 configs.SELECTIVE_DELAY_MS = selectiveDelayMs; // Reset the selective delay at end of test
             })();
         });
-        // TODO(fabio): Add test filling an order with a Wallet contract.
     });
     describe(WS_NOTIFICATION_ENDPOINT_PATH, () => {
         before(async () => {

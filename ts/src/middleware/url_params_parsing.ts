@@ -15,7 +15,7 @@ export function urlParamsParsing(
     next: express.NextFunction,
 ): void {
     const networkId = parseNetworkId(supportedNetworkIds, req.query.networkId);
-    // HACK: This is the recommended way to pass data from middlewares on. It's not beautiful nor fully type-safe.
+    // HACK(leo): This is the recommended way to pass data from middlewares on. It's not beautiful nor fully type-safe.
     req.networkId = networkId;
     next();
 }
