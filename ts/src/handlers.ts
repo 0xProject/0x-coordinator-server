@@ -443,6 +443,9 @@ export class Handlers {
                     },
                 ]);
             }
+        }
+        // Once we are sure all orders can be cancelled, we cancel them all at once
+        for (const order of coordinatorOrders) {
             await orderModel.cancelAsync(order);
         }
         const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
