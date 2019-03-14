@@ -8,7 +8,6 @@ import { Configs, FeeRecipient, NetworkSpecificSettings } from './types';
 enum EnvVarType {
     Port,
     Integer,
-    UnitAmount,
 }
 
 /**
@@ -52,17 +51,6 @@ function assertEnvVarType(name: string, value: any, expectedType: EnvVarType): a
                 returnValue = parseInt(value, 10);
             } catch (err) {
                 throw new Error(`${name} must be a valid integer, found ${value}.`);
-            }
-            return returnValue;
-
-        case EnvVarType.UnitAmount:
-            try {
-                returnValue = new BigNumber(parseFloat(value));
-                if (returnValue.isNegative) {
-                    throw new Error();
-                }
-            } catch (err) {
-                throw new Error(`${name} must be valid number greater than 0.`);
             }
             return returnValue;
 
