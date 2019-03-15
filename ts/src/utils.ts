@@ -1,5 +1,6 @@
 import { Schema, SchemaValidator } from '@0x/json-schemas';
 import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
+import * as ethUtil from 'ethereumjs-util';
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
 
@@ -34,6 +35,11 @@ export const utils = {
                 reason: `Function call encoded in 0x transaction data unsupported: ${functionName}`,
             },
         ]);
+    },
+    getAddressFromPrivateKey(privateKey: string): string {
+        const addressBuf = ethUtil.privateToAddress(Buffer.from(privateKey, 'hex'));
+        const address = ethUtil.addHexPrefix(addressBuf.toString('hex'));
+        return address;
     },
     getSupportedNetworkIds(configs: Configs): number[] {
         const supportedNetworkIds = _.map(_.keys(configs.NETWORK_ID_TO_SETTINGS), networkIdStr =>

@@ -3,6 +3,7 @@ import { assert } from '@0x/assert';
 import * as _ from 'lodash';
 
 import { Configs, FeeRecipient, NetworkSpecificSettings } from './types';
+import { utils } from './utils';
 
 enum EnvVarType {
     Port,
@@ -25,6 +26,14 @@ export function assertConfigsAreValid(configs: Configs): void {
         _.each(settings.FEE_RECIPIENTS, (feeRecipient: FeeRecipient, i: number) => {
             assert.isETHAddressHex(`settings.FEE_RECIPIENTS[${i}].ADDRESS`, feeRecipient.ADDRESS);
             assert.isString(`settings.FEE_RECIPIENTS[${i}].PRIVATE_KEY`, feeRecipient.PRIVATE_KEY);
+            const recoveredAddress = utils.getAddressFromPrivateKey(feeRecipient.PRIVATE_KEY);
+            if (recoveredAddress !== feeRecipient.ADDRESS) {
+                throw new Error(
+                    `FeeRecipientAddress ${feeRecipient.ADDRESS} does not correspond to the private key ${
+                        feeRecipient.PRIVATE_KEY
+                    }`,
+                );
+            }
         });
         assert.isUri('settings.RPC_URL', settings.RPC_URL);
     });
