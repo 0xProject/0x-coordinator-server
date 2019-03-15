@@ -103,8 +103,12 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
 }
 
 function broadcastCallback(event: BroadcastMessage, networkId: number): void {
-    const connectionStore = networkIdToConnectionStore[networkId] || new Set<WebSocket.connection>();
-    connectionStore.forEach((connection: WebSocket.connection) => {
+    const connectionStoreIfExists = networkIdToConnectionStore[networkId];
+    if (connectionStoreIfExists === undefined) {
+        // This error should never be hit
+        throw new Error(`Attempted to broadcast to unsupported networkId: ${networkId}`);
+    }
+    connectionStoreIfExists.forEach((connection: WebSocket.connection) => {
         connection.sendUTF(JSON.stringify(event));
     });
 }
