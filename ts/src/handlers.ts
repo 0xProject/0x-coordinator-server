@@ -532,7 +532,7 @@ export class Handlers {
         const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
         (contractAddresses as any).coordinator = constants.COORDINATOR_CONTRACT_ADDRESS;
         const domain = {
-            name: '0x Protocol Trade Execution Coordinator',
+            name: '0x Protocol Coordinator',
             version: '1.0.0',
             verifyingContractAddress: (contractAddresses as any).coordinator,
         };
