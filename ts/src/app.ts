@@ -3,6 +3,7 @@ import * as cors from 'cors';
 import * as express from 'express';
 import * as asyncHandler from 'express-async-handler';
 import * as http from 'http';
+import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 import * as WebSocket from 'websocket';
 
@@ -63,7 +64,7 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
     wss.on('request', async (request: any) => {
         // If the request isn't to the expected endpoint, reject
         if (!_.includes(request.resourceURL.path, '/v1/requests')) {
-            request.reject(404, 'NOT_FOUND');
+            request.reject(HttpStatus.NOT_FOUND, 'NOT_FOUND');
             return;
         }
         const networkIdStr = request.resourceURL.query.networkId || constants.DEFAULT_NETWORK_ID.toString();
