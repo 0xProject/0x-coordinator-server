@@ -195,10 +195,10 @@ export class Handlers {
         this._configs = configs;
         this._networkIdToContractWrappers = {};
         _.each(networkIdToProvider, (provider: Web3ProviderEngine, networkIdStr: string) => {
-            const contractWrappers = new ContractWrappers(provider, {
-                networkId: _.parseInt(networkIdStr),
-            });
             const networkId = _.parseInt(networkIdStr);
+            const contractWrappers = new ContractWrappers(provider, {
+                networkId,
+            });
             this._networkIdToContractWrappers[networkId] = contractWrappers;
         });
     }
