@@ -562,6 +562,7 @@ export class Handlers {
                 f => f.ADDRESS === feeRecipientAddress,
             );
             if (feeRecipientIfExists === undefined) {
+                // This error should never be hit
                 throw new Error(
                     `Unexpected error: Found feeRecipientAddress ${feeRecipientAddress} that wasn't specified in config.`,
                 );
