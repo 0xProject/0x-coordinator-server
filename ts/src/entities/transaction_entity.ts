@@ -25,7 +25,7 @@ export class TransactionEntity {
     public takerAddress!: string;
 
     @Column()
-    public signatures!: string;
+    public signatures!: string; // JSON encoded string
 
     @Column()
     public expirationTimeSeconds!: number;
