@@ -90,13 +90,20 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
         const connection: WebSocket.connection = request.accept(null, request.origin);
 
         // Note: We don't handle the `message` event because this is a broadcast-only endpoint
-        if (networkIdToConnectionStore[networkId] === undefined) {
-            networkIdToConnectionStore[networkId] = new Set<WebSocket.connection>();
+        const connectionStoreIfExists = networkIdToConnectionStore[networkId];
+        if (connectionStoreIfExists === undefined) {
+            // This error should never be hit
+            throw new Error(`Attempted to broadcast to unsupported networkId: ${networkId}`);
         }
-        networkIdToConnectionStore[networkId].add(connection);
+        connectionStoreIfExists.add(connection);
         connection.on('close', () => {
-            networkIdToConnectionStore[networkId].delete(connection);
+            connectionStoreIfExists.delete(connection);
         });
+    });
+
+    // Initialize the connectionStore mapping for supported networkIds
+    _.each(supportedNetworkIds, networkId => {
+        networkIdToConnectionStore[networkId] = new Set<WebSocket.connection>();
     });
 
     return server;
