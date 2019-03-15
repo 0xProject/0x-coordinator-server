@@ -19,7 +19,7 @@
         "snapshot_url": "http://ganache-snapshots.0x.org.s3.amazonaws.com/0x_ganache_snapshot-4.0.3.zip"
     },
     "devDependencies": {
-        "@0x/abi-gen-wrappers": "^4.1.0",
+        "@0x/abi-gen-wrappers": "^4.0.2",
         "@0x/contract-artifacts": "^1.4.0",
         "@0x/contracts-test-utils": "^3.0.4",
         "@0x/dev-utils": "^2.1.0",
