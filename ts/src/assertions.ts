@@ -1,5 +1,4 @@
 // tslint:disable:custom-no-magic-numbers
-import { BigNumber } from '0x.js';
 import { assert } from '@0x/assert';
 import * as _ from 'lodash';
 

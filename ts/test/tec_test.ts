@@ -1,17 +1,12 @@
-import {
-    assetDataUtils,
-    ContractWrappers,
-    orderHashUtils,
-    SignatureType,
-    SignedZeroExTransaction,
-    Web3ProviderEngine,
-    ZeroExTransaction,
-} from '0x.js';
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
+import { ContractWrappers } from '@0x/contract-wrappers';
 import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
+import { assetDataUtils, orderHashUtils, SignatureType } from '@0x/order-utils';
+import { Web3ProviderEngine } from '@0x/subproviders';
+import { SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import { BigNumber, fetchAsync } from '@0x/utils';
 import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as chai from 'chai';

@@ -1,16 +1,10 @@
-import {
-    ContractWrappers,
-    DecodedCalldata,
-    OrderAndTraderInfo,
-    signatureUtils,
-    transactionHashUtils,
-    Web3ProviderEngine,
-} from '0x.js';
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
-import { eip712Utils } from '@0x/order-utils';
+import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
+import { eip712Utils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
+import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignedOrder, SignedZeroExTransaction } from '@0x/types';
-import { BigNumber, signTypedDataUtils } from '@0x/utils';
+import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
 import * as ethUtil from 'ethereumjs-util';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';

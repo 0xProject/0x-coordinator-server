@@ -1,6 +1,7 @@
-import { BigNumber, ContractWrappers, ZeroExTransaction } from '0x.js';
+import { ContractWrappers } from '@0x/contract-wrappers';
 import { Web3ProviderEngine } from '@0x/subproviders';
-import { Order } from '@0x/types';
+import { Order, ZeroExTransaction } from '@0x/types';
+import { BigNumber } from '@0x/utils';
 import * as WebSocket from 'websocket';
 
 export interface Configs {
