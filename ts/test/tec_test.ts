@@ -58,7 +58,6 @@ let makerAddress: string;
 let takerAddress: string;
 let makerTokenContract: DummyERC20TokenContract;
 let takerTokenContract: DummyERC20TokenContract;
-let coordinatorSignerAddress: string;
 let transactionFactory: TransactionFactory;
 let orderFactory: OrderFactory;
 let provider: Web3ProviderEngine;
