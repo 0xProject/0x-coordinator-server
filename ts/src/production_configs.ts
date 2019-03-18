@@ -1,7 +1,5 @@
 import * as _ from 'lodash';
 
-import { constants } from './constants';
-
 export const configs = {
     // Network port to listen on
     HTTP_PORT: process.env.COORDINATOR_HTTP_PORT === undefined ? 3000 : _.parseInt(process.env.COORDINATOR_HTTP_PORT),
