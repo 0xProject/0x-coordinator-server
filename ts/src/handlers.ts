@@ -3,7 +3,7 @@ import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
 import { eip712Utils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
-import { Order, SignedOrder, SignedZeroExTransaction } from '@0x/types';
+import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
 import * as ethUtil from 'ethereumjs-util';
 import * as express from 'express';
@@ -571,12 +571,9 @@ export class Handlers {
                 ethUtil.toBuffer(coordinatorApprovalHashHex),
                 Buffer.from(feeRecipientIfExists.PRIVATE_KEY, 'hex'),
             );
-            const ecSignature = {
-                v: signature.v,
-                s: signature.s.toString(),
-                r: signature.r.toString(),
-            };
-            const approvalSignature = signatureUtils.convertECSignatureToSignatureHex(ecSignature);
+            const signatureBuffer = Buffer.concat([ethUtil.toBuffer(signature.v), signature.r, signature.s]);
+            const signatureHex = `0x${signatureBuffer.toString('hex')}`;
+            const approvalSignature = signatureUtils.convertToSignatureWithType(signatureHex, SignatureType.EIP712);
             signatures.push(approvalSignature);
         }
 
