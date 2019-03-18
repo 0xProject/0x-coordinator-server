@@ -26,6 +26,12 @@ export function assertConfigsAreValid(configs: Configs): void {
         _.each(settings.FEE_RECIPIENTS, (feeRecipient: FeeRecipient, i: number) => {
             assert.isETHAddressHex(`settings.FEE_RECIPIENTS[${i}].ADDRESS`, feeRecipient.ADDRESS);
             assert.isString(`settings.FEE_RECIPIENTS[${i}].PRIVATE_KEY`, feeRecipient.PRIVATE_KEY);
+            const PLACEHOLDER = 'FILL_ME_IN';
+            if (feeRecipient.ADDRESS === PLACEHOLDER || feeRecipient.PRIVATE_KEY === PLACEHOLDER) {
+                throw new Error(
+                    `Found placeholder value '${PLACEHOLDER}' in FEE_RECIPIENTS configs. Please replace with actual values.`,
+                );
+            }
             const recoveredAddress = utils.getAddressFromPrivateKey(feeRecipient.PRIVATE_KEY);
             if (recoveredAddress !== feeRecipient.ADDRESS) {
                 throw new Error(

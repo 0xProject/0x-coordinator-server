@@ -10,8 +10,8 @@ export const configs = {
         1: {
             FEE_RECIPIENTS: [
                 {
-                    ADDRESS: process.env.MAINNET_FEE_RECIPIENT_ADDRESS_ONE || constants.PLACEHOLDER,
-                    PRIVATE_KEY: process.env.MAINNET_FEE_RECIPIENT_PRIVATE_KEY_ONE || constants.PLACEHOLDER,
+                    ADDRESS: process.env.MAINNET_FEE_RECIPIENT_ADDRESS_ONE || 'FILL_ME_IN',
+                    PRIVATE_KEY: process.env.MAINNET_FEE_RECIPIENT_PRIVATE_KEY_ONE || 'FILL_ME_IN',
                 },
             ],
             RPC_URL: process.env.MAINNET_RPC_URL || 'https://mainnet.infura.io/v3/e2c067d9717e492091d1f1d7a2ec55aa',
