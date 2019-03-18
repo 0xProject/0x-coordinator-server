@@ -502,8 +502,8 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<RequestTransactionResponse> {
-        const approvalExpirationTimeSeconds = 1553135787;
-        // utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
+        const approvalExpirationTimeSeconds =
+            utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
 
         const approvalHashBuff = utils.getApprovalHashBuffer(
             signedTransaction,
