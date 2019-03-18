@@ -1,5 +1,8 @@
 import { Schema, SchemaValidator } from '@0x/json-schemas';
+import { eip712Utils, transactionHashUtils } from '@0x/order-utils';
+import { constants as orderUtilsConstants } from '@0x/order-utils/lib/src/constants';
 import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
+import { BigNumber, signTypedDataUtils } from '@0x/utils';
 import * as ethUtil from 'ethereumjs-util';
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
@@ -79,6 +82,35 @@ export const utils = {
     },
     getUnmarshalledObject(o: any): any {
         return JSON.parse(JSON.stringify(o));
+    },
+    getApprovalHashBuffer(
+        transaction: SignedZeroExTransaction,
+        verifyingContractAddress: string,
+        txOrigin: string,
+        approvalExpirationTimeSeconds: BigNumber,
+    ): Buffer {
+        const domain = {
+            name: orderUtilsConstants.COORDINATOR_DOMAIN_NAME,
+            version: orderUtilsConstants.COORDINATOR_DOMAIN_VERSION,
+            verifyingContractAddress,
+        };
+        const transactionHash = transactionHashUtils.getTransactionHashHex(transaction);
+        const approval = {
+            txOrigin,
+            transactionHash,
+            transactionSignature: transaction.signature,
+            approvalExpirationTimeSeconds: approvalExpirationTimeSeconds.toString(),
+        };
+        const typedData = eip712Utils.createTypedData(
+            orderUtilsConstants.COORDINATOR_APPROVAL_SCHEMA.name,
+            {
+                CoordinatorApproval: orderUtilsConstants.COORDINATOR_APPROVAL_SCHEMA.parameters,
+            },
+            approval,
+            domain,
+        );
+        const hashBuffer = signTypedDataUtils.generateTypedDataHash(typedData);
+        return hashBuffer;
     },
 };
 

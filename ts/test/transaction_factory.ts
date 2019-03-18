@@ -12,10 +12,7 @@ export class TransactionFactory {
         this._exchangeAddress = exchangeAddress;
         this._signerBuff = ethUtil.privateToAddress(this._privateKey);
     }
-    public newSignedTransaction(
-        data: string,
-        signatureType: SignatureType = SignatureType.EthSign,
-    ): SignedZeroExTransaction {
+    public newSignedTransaction(data: string, signatureType: SignatureType): SignedZeroExTransaction {
         const salt = generatePseudoRandomSalt();
         const signerAddress = `0x${this._signerBuff.toString('hex')}`;
         const transaction = {

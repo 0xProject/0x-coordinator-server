@@ -1,10 +1,10 @@
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
-import { eip712Utils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
+import { signatureUtils, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
-import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
+import { BigNumber, DecodedCalldata } from '@0x/utils';
 import * as ethUtil from 'ethereumjs-util';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
@@ -18,7 +18,6 @@ import * as requestTransactionSchema from './schemas/request_transaction_schema.
 import {
     BroadcastCallback,
     Configs,
-    CoordinatorApproval,
     EventTypes,
     NetworkIdToContractWrappers,
     NetworkIdToProvider,
@@ -503,47 +502,15 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<RequestTransactionResponse> {
-        // generate signature & expiry and add to DB
-        const approvalExpirationTimeSeconds =
-            utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
-        const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
-        const coordinatorApproval: CoordinatorApproval = {
+        const approvalExpirationTimeSeconds = 1553135787;
+        // utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
+
+        const approvalHashBuff = utils.getApprovalHashBuffer(
+            signedTransaction,
+            constants.COORDINATOR_CONTRACT_ADDRESS,
             txOrigin,
-            transactionHash,
-            transactionSignature: signedTransaction.signature,
-            approvalExpirationTimeSeconds,
-        };
-        const COORDINATOR_APPROVAL_SCHEMA = {
-            name: 'CoordinatorApproval',
-            parameters: [
-                { name: 'txOrigin', type: 'address' },
-                { name: 'transactionHash', type: 'bytes32' },
-                { name: 'transactionSignature', type: 'bytes' },
-                { name: 'approvalExpirationTimeSeconds', type: 'uint256' },
-            ],
-        };
-        const normalizedCoordinatorApproval = _.mapValues(coordinatorApproval, value => {
-            return !_.isString(value) ? value.toString() : value;
-        });
-        // TODO(fabio): Remove this hard-coding on the coordinator address once re-published contract-addresses
-        // package
-        // HACK(fabio): Hard-code fake Coordinator address until we've deployed the contract and added
-        // the address to `@0x/contract-addresses`
-        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
-        (contractAddresses as any).coordinator = constants.COORDINATOR_CONTRACT_ADDRESS;
-        const domain = {
-            name: '0x Protocol Coordinator',
-            version: '1.0.0',
-            verifyingContractAddress: (contractAddresses as any).coordinator,
-        };
-        const typedData = eip712Utils.createTypedData(
-            COORDINATOR_APPROVAL_SCHEMA.name,
-            { CoordinatorApproval: COORDINATOR_APPROVAL_SCHEMA.parameters },
-            normalizedCoordinatorApproval,
-            domain,
+            new BigNumber(approvalExpirationTimeSeconds),
         );
-        const coordinatorApprovalHashBuff = signTypedDataUtils.generateTypedDataHash(typedData);
-        const coordinatorApprovalHashHex = `0x${coordinatorApprovalHashBuff.toString('hex')}`;
 
         // Since a coordinator can have multiple feeRecipientAddresses,
         // we need to make sure we issue a signature for each feeRecipientAddress
@@ -567,14 +534,15 @@ export class Handlers {
                     `Unexpected error: Found feeRecipientAddress ${feeRecipientAddress} that wasn't specified in config.`,
                 );
             }
-            const signature = ethUtil.ecsign(
-                ethUtil.toBuffer(coordinatorApprovalHashHex),
-                Buffer.from(feeRecipientIfExists.PRIVATE_KEY, 'hex'),
-            );
-            const signatureBuffer = Buffer.concat([ethUtil.toBuffer(signature.v), signature.r, signature.s]);
-            const signatureHex = `0x${signatureBuffer.toString('hex')}`;
-            const approvalSignature = signatureUtils.convertToSignatureWithType(signatureHex, SignatureType.EIP712);
-            signatures.push(approvalSignature);
+            const signature = ethUtil.ecsign(approvalHashBuff, Buffer.from(feeRecipientIfExists.PRIVATE_KEY, 'hex'));
+            const signatureBuffer = Buffer.concat([
+                ethUtil.toBuffer(signature.v),
+                signature.r,
+                signature.s,
+                ethUtil.toBuffer(SignatureType.EIP712),
+            ]);
+            const approvalSignatureHex = ethUtil.addHexPrefix(signatureBuffer.toString('hex'));
+            signatures.push(approvalSignatureHex);
         }
 
         // Insert signature into DB

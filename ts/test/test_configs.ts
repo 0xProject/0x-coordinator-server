@@ -9,11 +9,11 @@ export const configs = {
             FEE_RECIPIENTS: [
                 {
                     ADDRESS: FEE_RECIPIENT_ADDRESS_ONE,
-                    PRIVATE_KEY: '752dd9cf65e68cfaba7d60225cbdbc1f4729dd5e5507def72815ed0d8abc6249',
+                    PRIVATE_KEY: 'ff12e391b79415e941a94de3bf3a9aee577aed0731e297d5cfa0b8a1e02fa1d0',
                 },
                 {
                     ADDRESS: FEE_RECIPIENT_ADDRESS_TWO,
-                    PRIVATE_KEY: 'efb595a0178eb79a8df953f87c5148402a224cdf725e88c0146727c6aceadccd',
+                    PRIVATE_KEY: '752dd9cf65e68cfaba7d60225cbdbc1f4729dd5e5507def72815ed0d8abc6249',
                 },
             ],
             // Ethereum RPC url

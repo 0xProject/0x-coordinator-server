@@ -53,9 +53,9 @@ let app: http.Server;
 
 let web3Wrapper: Web3Wrapper;
 let owner: string;
-let senderAddress: string;
 let makerAddress: string;
 let takerAddress: string;
+let feeRecipientAddress: string;
 let makerTokenContract: DummyERC20TokenContract;
 let takerTokenContract: DummyERC20TokenContract;
 let transactionFactory: TransactionFactory;
@@ -92,16 +92,20 @@ describe('Coordinator server', () => {
 
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
-        [owner, senderAddress, makerAddress, takerAddress] = _.slice(accounts, 0, 6);
+        [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
 
         contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
         const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
+        if (feeRecipientAddress !== settings.FEE_RECIPIENTS[0].ADDRESS) {
+            throw new Error(`Expected settings.FEE_RECIPEINTS[0].ADDRESS to be ${feeRecipientAddress}`);
+        }
+
         const defaultOrderParams = {
             ...testConstants.STATIC_ORDER_PARAMS,
-            senderAddress,
+            senderAddress: constants.COORDINATOR_CONTRACT_ADDRESS,
             exchangeAddress: contractAddresses.exchange,
             makerAddress,
-            feeRecipientAddress: settings.FEE_RECIPIENTS[0].ADDRESS,
+            feeRecipientAddress,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
         };
@@ -863,6 +867,6 @@ function onMessage(client: WebSocket.w3cwebsocket, messageNumber: number): Array
 function createSignedTransaction(data: string, signerAddress: string): SignedZeroExTransaction {
     const privateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(signerAddress)];
     transactionFactory = new TransactionFactory(privateKey, contractAddresses.exchange);
-    const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EthSign);
+    const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EIP712);
     return signedTransaction;
 }
