@@ -65,11 +65,7 @@ export class Handlers {
                 traderInfo.takerBalance,
                 traderInfo.takerAllowance,
             );
-            minSet.push(
-                maxTakerAssetFillAmountGivenTakerConstraints,
-                traderInfo.takerBalance,
-                traderInfo.takerAllowance,
-            );
+            minSet.push(maxTakerAssetFillAmountGivenTakerConstraints);
         }
 
         // Calculate min of balance & allowance of maker's makerAsset -> translate into takerAsset amount
