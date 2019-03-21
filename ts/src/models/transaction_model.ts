@@ -39,7 +39,7 @@ export const transactionModel = {
             query = query.andWhere('transaction.takerAddress = :takerAddress', { takerAddress: opts.takerAddress });
         }
         if (opts !== undefined && opts.isUnexpired) {
-            const currentExpiration = Math.round(Date.now() / 1000);
+            const currentExpiration = utils.getCurrentTimestampSeconds();
             query = query.andWhere('transaction.expirationTimeSeconds > :currentExpiration', {
                 currentExpiration,
             });
