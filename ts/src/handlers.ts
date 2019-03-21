@@ -102,7 +102,7 @@ export class Handlers {
         const maxTakerAssetFillAmount = BigNumber.min(...minSet);
         return maxTakerAssetFillAmount;
     }
-    private static _getOrdersFromDecodedCallData(decodedCalldata: DecodedCalldata, networkId: number): Order[] {
+    private static _getOrdersFromDecodedCalldata(decodedCalldata: DecodedCalldata, networkId: number): Order[] {
         const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
 
         switch (decodedCalldata.functionName) {
@@ -226,7 +226,7 @@ export class Handlers {
 
         // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
         let orders: Order[] = [];
-        orders = Handlers._getOrdersFromDecodedCallData(decodedCalldata, networkId);
+        orders = Handlers._getOrdersFromDecodedCalldata(decodedCalldata, networkId);
         const coordinatorOrders = _.filter(orders, order => {
             const coordinatorFeeRecipients = this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS;
             const coordinatorFeeRecipientAddresses = _.map(
@@ -278,7 +278,7 @@ export class Handlers {
             case ExchangeMethods.MarketBuyOrders:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
                 const takerAddress = signedTransaction.signerAddress;
-                const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCallDataAsync(
+                const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCalldataAsync(
                     decodedCalldata,
                     takerAddress,
                     networkId,
@@ -319,7 +319,7 @@ export class Handlers {
                 throw utils.getInvalidFunctionCallError(decodedCalldata.functionName);
         }
     }
-    private async _getTakerAssetFillAmountsFromDecodedCallDataAsync(
+    private async _getTakerAssetFillAmountsFromDecodedCalldataAsync(
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
         networkId: number,
