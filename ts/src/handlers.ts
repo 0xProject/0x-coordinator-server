@@ -481,7 +481,13 @@ export class Handlers {
         await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Await selective delay
 
         // Check that still a valid fill request after selective delay
-        await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
+        if (this._configs.SELECTIVE_DELAY_MS !== 0) {
+            await Handlers._validateFillsAllowedOrThrowAsync(
+                signedTransaction,
+                coordinatorOrders,
+                takerAssetFillAmounts,
+            );
+        }
 
         const response = await this._generateAndStoreSignatureAsync(
             txOrigin,
