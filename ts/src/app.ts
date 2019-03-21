@@ -102,7 +102,7 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
     });
 
     // Initialize the connectionStore mapping for supported networkIds
-    _.each(supportedNetworkIds, networkId => {
+    supportedNetworkIds.forEach(networkId => {
         networkIdToConnectionStore[networkId] = new Set<WebSocket.connection>();
     });
 
