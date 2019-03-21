@@ -34,11 +34,10 @@ export const orderModel = {
         if (orderIfExists === undefined) {
             orderEntity = new OrderEntity();
             orderEntity.hash = orderHash;
-            orderEntity.isCancelled = true;
         } else {
             orderEntity = orderIfExists;
-            orderEntity.isCancelled = true;
         }
+        orderEntity.isCancelled = true;
         await connection.manager.save(OrderEntity, orderEntity);
     },
     getHash(order: Order): string {
