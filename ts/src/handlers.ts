@@ -96,7 +96,7 @@ export class Handlers {
             const maxTakerAssetFillAmountGivenMakerZRXConstraints = makerZRXAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.makerFee)
-                .integerValue(BigNumber.ROUND_CEIL); // Should this round to ciel or floor?
+                .integerValue(BigNumber.ROUND_FLOOR);
             minSet.push(maxTakerAssetFillAmountGivenMakerZRXConstraints);
         }
 
