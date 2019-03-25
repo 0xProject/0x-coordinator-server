@@ -6,5 +6,5 @@ export class OrderEntity {
     public hash!: string;
 
     @Column()
-    public isCancelled!: boolean;
+    public isSoftCancelled!: boolean;
 }

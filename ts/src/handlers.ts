@@ -172,8 +172,8 @@ export class Handlers {
             }
 
             // If cancelled, reject the request
-            const isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
-            if (isCancelled) {
+            const isSoftCancelled = await orderModel.isSoftCancelledAsync(coordinatorOrder);
+            if (isSoftCancelled) {
                 throw new ValidationError([
                     {
                         field: 'signedTransaction.data',

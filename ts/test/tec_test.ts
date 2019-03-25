@@ -1,5 +1,7 @@
+import { CoordinatorContract } from '@0x/abi-gen-wrappers';
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
+import { Coordinator as CoordinatorArtifact } from '@0x/contract-artifacts';
 import { ContractWrappers } from '@0x/contract-wrappers';
 import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
@@ -322,10 +324,10 @@ describe('Coordinator server', () => {
             expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
             // Check that only the Coordinator order got cancelled in DB
-            let isCancelled = await orderModel.isCancelledAsync(coordinatorOrder);
-            expect(isCancelled).to.be.true();
-            isCancelled = await orderModel.isCancelledAsync(notCoordinatorOrder);
-            expect(isCancelled).to.be.false();
+            let isSoftCancelled = await orderModel.isSoftCancelledAsync(coordinatorOrder);
+            expect(isSoftCancelled).to.be.true();
+            isSoftCancelled = await orderModel.isSoftCancelledAsync(notCoordinatorOrder);
+            expect(isSoftCancelled).to.be.false();
         });
         it('should return 200 OK & mark order as cancelled if successfully batch cancelling orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -345,10 +347,10 @@ describe('Coordinator server', () => {
             expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
             // Check that orders cancelled in DB
-            let isCancelled = await orderModel.isCancelledAsync(orderOne);
-            expect(isCancelled).to.be.true();
-            isCancelled = await orderModel.isCancelledAsync(orderTwo);
-            expect(isCancelled).to.be.true();
+            let isSoftCancelled = await orderModel.isSoftCancelledAsync(orderOne);
+            expect(isSoftCancelled).to.be.true();
+            isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
+            expect(isSoftCancelled).to.be.true();
         });
         it('should return 400 and leave order uncancelled if non-maker tried to cancel an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -368,8 +370,8 @@ describe('Coordinator server', () => {
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.OnlyMakerCanCancelOrders);
 
             // Verify that order wasn't cancelled
-            const isCancelled = await orderModel.isCancelledAsync(order);
-            expect(isCancelled).to.be.false();
+            const isSoftCancelled = await orderModel.isSoftCancelledAsync(order);
+            expect(isSoftCancelled).to.be.false();
         });
         it('should return 200 OK & mark order as cancelled if successfully cancelling an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -388,8 +390,8 @@ describe('Coordinator server', () => {
             expect(response.body.outstandingSignatures.length).to.be.equal(0);
 
             // Check that order cancelled in DB
-            const isCancelled = await orderModel.isCancelledAsync(order);
-            expect(isCancelled).to.be.true();
+            const isSoftCancelled = await orderModel.isSoftCancelledAsync(order);
+            expect(isSoftCancelled).to.be.true();
 
             // Check that someone trying to fill the order, can't
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
@@ -547,7 +549,25 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmount);
 
-            // TODO(fabio): Check that the signature returned would be accepted by the Coordinator smart contract
+            const coordinatorContract = new CoordinatorContract(
+                CoordinatorArtifact.compilerOutput.abi,
+                constants.COORDINATOR_CONTRACT_ADDRESS,
+                provider,
+            );
+
+            await web3Wrapper.awaitTransactionSuccessAsync(
+                await coordinatorContract.executeTransaction.sendTransactionAsync(
+                    signedTransaction,
+                    txOrigin,
+                    signedTransaction.signature,
+                    [response.body.expirationTimeSeconds],
+                    [response.body.signatures[0]],
+                    {
+                        from: takerAddress,
+                    },
+                ),
+                testConstants.AWAIT_TRANSACTION_MINED_MS,
+            );
         });
         it('should return 200 OK if request to marketSell uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();

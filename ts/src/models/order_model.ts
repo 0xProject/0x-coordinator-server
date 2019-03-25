@@ -10,7 +10,7 @@ export const orderModel = {
         let orderEntity = new OrderEntity();
         const orderHash = orderModel.getHash(order);
         orderEntity.hash = orderHash;
-        orderEntity.isCancelled = false;
+        orderEntity.isSoftCancelled = false;
 
         const connection = getDBConnection();
         orderEntity = await connection.manager.save(OrderEntity, orderEntity);
@@ -22,9 +22,9 @@ export const orderModel = {
         const orderIfExists = await connection.manager.findOne(OrderEntity, orderHash);
         return orderIfExists;
     },
-    async isCancelledAsync(order: Order): Promise<boolean> {
+    async isSoftCancelledAsync(order: Order): Promise<boolean> {
         const orderIfExists = await orderModel.findAsync(order);
-        return !_.isUndefined(orderIfExists) && orderIfExists.isCancelled;
+        return !_.isUndefined(orderIfExists) && orderIfExists.isSoftCancelled;
     },
     async cancelAsync(order: Order): Promise<void> {
         const orderHash = orderModel.getHash(order);
@@ -37,7 +37,7 @@ export const orderModel = {
         } else {
             orderEntity = orderIfExists;
         }
-        orderEntity.isCancelled = true;
+        orderEntity.isSoftCancelled = true;
         await connection.manager.save(OrderEntity, orderEntity);
     },
     getHash(order: Order): string {
