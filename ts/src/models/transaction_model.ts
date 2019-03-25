@@ -12,6 +12,13 @@ import { OrderHashToFillAmount, OutstandingSignature } from '../types';
 import { orderModel } from './order_model';
 
 export const transactionModel = {
+    async findByHashAsync(transactionHash: string): Promise<TransactionEntity | undefined> {
+        const connection = getDBConnection();
+        const transactionIfExists = await connection.manager.findOne(TransactionEntity, {
+            hash: transactionHash,
+        });
+        return transactionIfExists;
+    },
     async findAsync(takerAddress: string, signatures: string): Promise<TransactionEntity | undefined> {
         const connection = getDBConnection();
         const transactionIfExists = await connection.manager.findOne(TransactionEntity, {
@@ -52,6 +59,8 @@ export const transactionModel = {
         return transactionsIfExists;
     },
     async createAsync(
+        transactionHash: string,
+        txOrigin: string,
         signatures: string[],
         expirationTimeSeconds: number,
         takerAddress: string,
@@ -61,6 +70,8 @@ export const transactionModel = {
         let transactionEntity = new TransactionEntity();
         // We store the signatures as a JSON array of signatures since we don't expect to ever query by
         // a specific signature
+        transactionEntity.hash = transactionHash;
+        transactionEntity.txOrigin = txOrigin;
         transactionEntity.signatures = JSON.stringify(signatures);
         transactionEntity.expirationTimeSeconds = expirationTimeSeconds;
         transactionEntity.takerAddress = takerAddress;

@@ -655,7 +655,7 @@ describe('Coordinator server', () => {
             );
             expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
         });
-        it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
+        it('should return 400 TRANSACTION_ALREADY_USED if request same 0x transaction multiple times', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount; // Full amount
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
@@ -679,8 +679,54 @@ describe('Coordinator server', () => {
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.TransactionAlreadyUsed);
+        });
+        it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount; // Full amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const dataOne = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransactionOne = createSignedTransaction(dataOne, takerAddress);
+            let body = {
+                signedTransaction: signedTransactionOne,
+                txOrigin: takerAddress,
+            };
+            let response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            const dataTwo = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransactionTwo = createSignedTransaction(dataTwo, takerAddress);
+            body = {
+                signedTransaction: signedTransactionTwo,
+                txOrigin: takerAddress,
+            };
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(
                 ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
+            );
+        });
+    });
+    describe('With selective delay', () => {
+        before(async () => {
+            const configWithDelay = {
+                ...configs,
+                SELECTIVE_DELAY_MS: 1000,
+            };
+            app = await getAppAsync(
+                {
+                    [NETWORK_ID]: provider,
+                },
+                configWithDelay,
             );
         });
         it('should abort fill request if cancellation received during selective delay', done => {

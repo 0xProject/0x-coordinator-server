@@ -1,12 +1,12 @@
-import { Column, Entity, JoinTable, ManyToMany, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, JoinTable, ManyToMany, OneToMany, PrimaryColumn } from 'typeorm';
 
 import { OrderEntity } from './order_entity';
 import { TakerAssetFillAmountEntity } from './taker_asset_fill_amount_entity';
 
 @Entity({ name: 'transaction' })
 export class TransactionEntity {
-    @PrimaryGeneratedColumn()
-    public id!: number;
+    @PrimaryColumn()
+    public hash!: string;
 
     @ManyToMany(_type => OrderEntity)
     @JoinTable()
@@ -23,6 +23,9 @@ export class TransactionEntity {
 
     @Column()
     public takerAddress!: string;
+
+    @Column()
+    public txOrigin!: string;
 
     @Column()
     public signatures!: string; // JSON encoded string

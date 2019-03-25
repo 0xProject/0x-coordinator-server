@@ -46,4 +46,5 @@ export enum ValidationErrorCodes {
     OnlyMakerCanCancelOrders = 1008,
     FunctionCallUnsupported = 1009,
     FillRequestsExceededTakerAssetAmount = 1010,
+    TransactionAlreadyUsed = 1011,
 }

@@ -246,8 +246,22 @@ export class Handlers {
             ]);
         }
 
-        // 4. Validate the 0x transaction signature
+        // 4. Enforce that a 0x transaction hasn't been used before. This prevents someone from requesting
+        // the same transaction with a different `txOrigin` in an attempt to fill the order through an
+        // alternative tx.origin entry-point.
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
+        const transactionIfExists = await transactionModel.findByHashAsync(transactionHash);
+        if (transactionIfExists !== undefined) {
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction',
+                    code: ValidationErrorCodes.TransactionAlreadyUsed,
+                    reason: `A transaction can only be approved once. To request approval to perform the same actions, generate and sign an identical transaction with a different salt value.`,
+                },
+            ]);
+        }
+
+        // 5. Validate the 0x transaction signature
         const provider = this._networkIdToProvider[networkId];
         const isValidSignature = await signatureUtils.isValidSignatureAsync(
             provider,
@@ -265,7 +279,7 @@ export class Handlers {
             ]);
         }
 
-        // 5. Handle the request
+        // 6. Handle the request
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
@@ -548,7 +562,10 @@ export class Handlers {
         }
 
         // Insert signature into DB
+        const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         await transactionModel.createAsync(
+            transactionHash,
+            txOrigin,
             signatures,
             approvalExpirationTimeSeconds,
             signedTransaction.signerAddress,
