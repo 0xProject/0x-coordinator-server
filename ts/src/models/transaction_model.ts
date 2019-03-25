@@ -31,7 +31,7 @@ export const transactionModel = {
         orders: Order[],
         opts?: {
             takerAddress?: string;
-            isUnexpired?: boolean;
+            isExpired?: boolean;
         },
     ): Promise<TransactionEntity[]> {
         const connection = getDBConnection();
@@ -45,7 +45,7 @@ export const transactionModel = {
         if (opts !== undefined && opts.takerAddress !== undefined) {
             query = query.andWhere('transaction.takerAddress = :takerAddress', { takerAddress: opts.takerAddress });
         }
-        if (opts !== undefined && opts.isUnexpired) {
+        if (opts !== undefined && !opts.isExpired) {
             const currentExpiration = Math.round(Date.now() / 1000);
             query = query.andWhere('transaction.expirationTimeSeconds > :currentExpiration', {
                 currentExpiration,
@@ -128,7 +128,7 @@ export const transactionModel = {
     },
     async getOutstandingSignaturesByOrdersAsync(coordinatorOrders: Order[]): Promise<OutstandingSignature[]> {
         const coordinatorOrderHashes = _.map(coordinatorOrders, o => orderModel.getHash(o));
-        const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders, { isUnexpired: true });
+        const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders, { isExpired: false });
         const outstandingSignatures: OutstandingSignature[] = [];
         _.each(transactions, transaction => {
             _.each(transaction.orders, order => {
