@@ -305,13 +305,13 @@ export class Handlers {
                 );
                 res.status(response.status).send(response.body);
                 // After responding to taker's request, we broadcast the fill acceptance to all WS connections
-                const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
                 const fillRequestAcceptedEvent = {
                     type: EventTypes.FillRequestAccepted,
                     data: {
                         functionName: decodedCalldata.functionName,
                         orders: coordinatorOrders,
-                        zeroExTransaction: unsignedTransaction,
+                        txOrigin,
+                        signedZeroExTransaction: signedTransaction,
                         coordinatorSignatures: response.body.signatures,
                         coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
                     },
