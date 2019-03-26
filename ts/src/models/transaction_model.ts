@@ -143,7 +143,7 @@ export const transactionModel = {
                     }
                     outstandingSignatures.push({
                         orderHash: order.hash,
-                        coordinatorSignatures: JSON.parse(transaction.signatures),
+                        approvalSignatures: JSON.parse(transaction.signatures),
                         expirationTimeSeconds: transaction.expirationTimeSeconds,
                         takerAssetFillAmount: fillAmount.takerAssetFillAmount,
                     });

@@ -48,8 +48,8 @@ export interface FillRequestAcceptedEvent {
         orders: Order[];
         txOrigin: string;
         signedZeroExTransaction: ZeroExTransaction;
-        coordinatorSignatures: string[];
-        coordinatorSignatureExpiration: number;
+        approvalSignatures: string[];
+        approvalExpirationTimeSeconds: number;
     };
 }
 
@@ -70,7 +70,7 @@ export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEve
 export type BroadcastCallback = (message: BroadcastMessage, networkId: number) => void;
 
 export interface OutstandingSignature {
-    coordinatorSignatures: string[];
+    approvalSignatures: string[];
     expirationTimeSeconds: number;
     orderHash: string;
     takerAssetFillAmount: BigNumber;

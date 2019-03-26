@@ -311,8 +311,8 @@ export class Handlers {
                         orders: coordinatorOrders,
                         txOrigin,
                         signedZeroExTransaction: signedTransaction,
-                        coordinatorSignatures: response.body.signatures,
-                        coordinatorSignatureExpiration: response.body.expirationTimeSeconds,
+                        approvalSignatures: response.body.signatures,
+                        approvalExpirationTimeSeconds: response.body.expirationTimeSeconds,
                     },
                 };
                 this._broadcastCallback(fillRequestAcceptedEvent, networkId);

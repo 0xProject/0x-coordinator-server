@@ -438,7 +438,7 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
             expect(response.body.outstandingSignatures.length).to.be.equal(1);
-            expect(response.body.outstandingSignatures[0].coordinatorSignatures[0]).to.be.equal(
+            expect(response.body.outstandingSignatures[0].approvalSignatures[0]).to.be.equal(
                 fillResponse.body.signatures[0],
             );
             expect(response.body.outstandingSignatures[0].expirationTimeSeconds).to.be.equal(
@@ -857,9 +857,9 @@ describe('Coordinator server', () => {
             const FillRequestAcceptedEventMessage = await clientOnMessagePromises[1];
             const fillRequestAcceptedEvent = JSON.parse(FillRequestAcceptedEventMessage.data);
             expect(fillRequestAcceptedEvent.type).to.be.equal(EventTypes.FillRequestAccepted);
-            expect(fillRequestAcceptedEvent.data.coordinatorSignatures).to.not.be.undefined();
-            expect(fillRequestAcceptedEvent.data.coordinatorSignatures.length).to.be.equal(1);
-            expect(fillRequestAcceptedEvent.data.coordinatorSignatureExpiration).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.approvalSignatures).to.not.be.undefined();
+            expect(fillRequestAcceptedEvent.data.approvalSignatures.length).to.be.equal(1);
+            expect(fillRequestAcceptedEvent.data.approvalExpirationTimeSeconds).to.not.be.undefined();
         });
         it('should emit WS event when valid cancel request accepted', async () => {
             // Register an onMessage handler to the WS client
