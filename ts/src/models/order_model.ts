@@ -10,6 +10,7 @@ export const orderModel = {
         let orderEntity = new OrderEntity();
         const orderHash = orderModel.getHash(order);
         orderEntity.hash = orderHash;
+        orderEntity.expirationTimeSeconds = order.expirationTimeSeconds;
         orderEntity.isSoftCancelled = false;
 
         const connection = getDBConnection();
