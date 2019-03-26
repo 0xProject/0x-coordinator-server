@@ -50,6 +50,7 @@ export const orderModel = {
         if (orderIfExists === undefined) {
             orderEntity = new OrderEntity();
             orderEntity.hash = orderHash;
+            orderEntity.expirationTimeSeconds = order.expirationTimeSeconds;
         } else {
             orderEntity = orderIfExists;
         }
