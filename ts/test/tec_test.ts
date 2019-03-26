@@ -852,7 +852,7 @@ describe('Coordinator server', () => {
             const expectedFillRequestReceivedEvent: FillRequestReceivedEvent = {
                 type: EventTypes.FillRequestReceived,
                 data: {
-                    zeroExTransactionHash: transactionHash,
+                    transactionHash: transactionHash,
                 },
             };
             expect(fillRequestReceivedEvent).to.be.deep.equal(expectedFillRequestReceivedEvent);
@@ -897,7 +897,7 @@ describe('Coordinator server', () => {
                 type: EventTypes.CancelRequestAccepted,
                 data: {
                     orders: [utils.getUnmarshalledObject(order)],
-                    zeroExTransaction: unsignedTransaction as ZeroExTransaction,
+                    transaction: unsignedTransaction as ZeroExTransaction,
                 },
             };
             expect(cancelRequestAcceptedEvent).to.be.deep.equal(expectedCancelRequestAcceptedEvent);

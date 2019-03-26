@@ -468,7 +468,7 @@ export class Handlers {
             type: EventTypes.CancelRequestAccepted,
             data: {
                 orders: coordinatorOrders,
-                zeroExTransaction: unsignedTransaction,
+                transaction: unsignedTransaction,
             },
         };
         this._broadcastCallback(cancelRequestAccepted, networkId);
@@ -493,7 +493,7 @@ export class Handlers {
         const fillRequestReceivedEvent = {
             type: EventTypes.FillRequestReceived,
             data: {
-                zeroExTransactionHash: transactionHash,
+                transactionHash: transactionHash,
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent, networkId);
