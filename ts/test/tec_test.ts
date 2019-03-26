@@ -852,7 +852,7 @@ describe('Coordinator server', () => {
             const expectedFillRequestReceivedEvent: FillRequestReceivedEvent = {
                 type: EventTypes.FillRequestReceived,
                 data: {
-                    transactionHash: transactionHash,
+                    transactionHash,
                 },
             };
             expect(fillRequestReceivedEvent).to.be.deep.equal(expectedFillRequestReceivedEvent);
