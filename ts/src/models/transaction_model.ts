@@ -8,6 +8,7 @@ import { TakerAssetFillAmountEntity } from '../entities/taker_asset_fill_amount_
 import { TransactionEntity } from '../entities/transaction_entity';
 import { takerAssetFillAmountModel } from '../models/taker_asset_fill_amount_model';
 import { OrderHashToFillAmount, OutstandingSignature } from '../types';
+import { utils } from '../utils';
 
 import { orderModel } from './order_model';
 
@@ -46,7 +47,7 @@ export const transactionModel = {
             query = query.andWhere('transaction.takerAddress = :takerAddress', { takerAddress: opts.takerAddress });
         }
         if (opts !== undefined && !opts.isExpired) {
-            const currentExpiration = Math.round(Date.now() / 1000);
+            const currentExpiration = utils.getCurrentTimestampSeconds();
             query = query.andWhere('transaction.expirationTimeSeconds > :currentExpiration', {
                 currentExpiration,
             });
