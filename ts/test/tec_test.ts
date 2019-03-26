@@ -88,8 +88,7 @@ describe('Coordinator server', () => {
         });
 
         web3Wrapper = new Web3Wrapper(provider);
-        // TODO(fabio): Fix Web3Wrapper incompatability issues
-        blockchainLifecycle = new BlockchainLifecycle(web3Wrapper as any);
+        blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
 
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
