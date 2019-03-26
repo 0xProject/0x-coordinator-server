@@ -28,7 +28,7 @@ export class TransactionEntity {
     public txOrigin!: string;
 
     @Column()
-    public signatures!: string; // JSON encoded string
+    public approvalSignatures!: string; // JSON encoded string
 
     @Column()
     public expirationTimeSeconds!: number;

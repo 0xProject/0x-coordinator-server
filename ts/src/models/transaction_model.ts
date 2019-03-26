@@ -20,11 +20,11 @@ export const transactionModel = {
         });
         return transactionIfExists;
     },
-    async findAsync(takerAddress: string, signatures: string): Promise<TransactionEntity | undefined> {
+    async findAsync(takerAddress: string, approvalSignatures: string): Promise<TransactionEntity | undefined> {
         const connection = getDBConnection();
         const transactionIfExists = await connection.manager.findOne(TransactionEntity, {
             takerAddress,
-            signatures,
+            approvalSignatures,
         });
         return transactionIfExists;
     },
@@ -62,18 +62,18 @@ export const transactionModel = {
     async createAsync(
         transactionHash: string,
         txOrigin: string,
-        signatures: string[],
+        approvalSignatures: string[],
         expirationTimeSeconds: number,
         takerAddress: string,
         orders: Order[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<TransactionEntity> {
         let transactionEntity = new TransactionEntity();
-        // We store the signatures as a JSON array of signatures since we don't expect to ever query by
+        // We store the approvalSignatures as a JSON array of signatures since we don't expect to ever query by
         // a specific signature
         transactionEntity.hash = transactionHash;
         transactionEntity.txOrigin = txOrigin;
-        transactionEntity.signatures = JSON.stringify(signatures);
+        transactionEntity.approvalSignatures = JSON.stringify(approvalSignatures);
         transactionEntity.expirationTimeSeconds = expirationTimeSeconds;
         transactionEntity.takerAddress = takerAddress;
 
@@ -144,7 +144,7 @@ export const transactionModel = {
                     }
                     outstandingSignatures.push({
                         orderHash: order.hash,
-                        approvalSignatures: JSON.parse(transaction.signatures),
+                        approvalSignatures: JSON.parse(transaction.approvalSignatures),
                         expirationTimeSeconds: transaction.expirationTimeSeconds,
                         takerAssetFillAmount: fillAmount.takerAssetFillAmount,
                     });
