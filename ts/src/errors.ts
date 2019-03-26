@@ -13,6 +13,7 @@ export interface ValidationErrorItem {
     field: string;
     code: ValidationErrorCodes;
     reason: string;
+    entities?: string[];
 }
 
 export class ValidationError extends BadRequestError {

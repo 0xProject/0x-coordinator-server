@@ -143,6 +143,19 @@ export class Handlers {
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<void> {
+        // If any orders soft-cancelled, reject request
+        const softCancelledOrderHashes = await orderModel.findSoftCancelledOrdersAsync(coordinatorOrders);
+        if (softCancelledOrderHashes.length > 0) {
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction.data',
+                    code: ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
+                    reason: `Cannot fill orders because some have already been soft-cancelled`,
+                    entities: softCancelledOrderHashes,
+                },
+            ]);
+        }
+
         // Takers can only request to fill an order entirely once. If they do multiple
         // partial fills, we keep track and make sure they have a sufficient partial fill
         // amount left for this request to get approved.
@@ -165,18 +178,6 @@ export class Handlers {
                         field: 'signedTransaction.data',
                         code: ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
                         reason: `A taker can only request to fill an order fully once. This request would exceed this amount for order with hash ${orderHash}`,
-                    },
-                ]);
-            }
-
-            // If cancelled, reject the request
-            const isSoftCancelled = await orderModel.isSoftCancelledAsync(coordinatorOrder);
-            if (isSoftCancelled) {
-                throw new ValidationError([
-                    {
-                        field: 'signedTransaction.data',
-                        code: ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
-                        reason: `Cannot fill order with hash ${orderHash} because it's already been soft-cancelled`,
                     },
                 ]);
             }

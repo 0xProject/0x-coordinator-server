@@ -26,6 +26,21 @@ export const orderModel = {
         const orderIfExists = await orderModel.findAsync(order);
         return !_.isUndefined(orderIfExists) && orderIfExists.isSoftCancelled;
     },
+    async findSoftCancelledOrdersAsync(orders: Order[]): Promise<string[]> {
+        const orderHashes = _.map(orders, order => orderModel.getHash(order));
+        const connection = getDBConnection();
+        const query = connection
+            .getRepository(OrderEntity)
+            .createQueryBuilder('order')
+            .where('hash IN (:...orderHashes)', { orderHashes })
+            .andWhere('isSoftCancelled = true');
+        const cancelledOrdersIfExist = await query.getMany();
+        if (cancelledOrdersIfExist === undefined) {
+            return [];
+        }
+        const cancelledOrderHashes = _.map(cancelledOrdersIfExist, o => o.hash);
+        return cancelledOrderHashes;
+    },
     async cancelAsync(order: Order): Promise<void> {
         const orderHash = orderModel.getHash(order);
         const connection = getDBConnection();

@@ -407,6 +407,8 @@ describe('Coordinator server', () => {
             expect(fillResponse.body.validationErrors[0].code).to.be.equal(
                 ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
             );
+            const orderHash = orderHashUtils.getOrderHashHex(order);
+            expect(fillResponse.body.validationErrors[0].entities).to.be.equal([orderHash]);
         });
         it('should return 200 OK to order cancellation request & return outstandingSignatures', async () => {
             const order = await orderFactory.newSignedOrderAsync();
