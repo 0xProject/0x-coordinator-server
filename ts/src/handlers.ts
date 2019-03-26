@@ -1,16 +1,15 @@
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
-import { signatureUtils, transactionHashUtils } from '@0x/order-utils';
+import { eip712Utils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
-import { BigNumber, DecodedCalldata } from '@0x/utils';
+import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
 import * as ethUtil from 'ethereumjs-util';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { constants } from './constants';
 import { ValidationError, ValidationErrorCodes } from './errors';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
@@ -49,7 +48,6 @@ export class Handlers {
     private readonly _broadcastCallback: BroadcastCallback;
     private readonly _networkIdToContractWrappers: NetworkIdToContractWrappers;
     private readonly _configs: Configs;
-    // TODO(fabio): Move this method into @0x/order-utils package
     private static _calculateRemainingFillableTakerAssetAmount(
         signedOrder: SignedOrder,
         orderAndTraderInfo: OrderAndTraderInfo,
@@ -521,12 +519,14 @@ export class Handlers {
         const approvalExpirationTimeSeconds =
             utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
 
-        const approvalHashBuff = utils.getApprovalHashBuffer(
+        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
+        const typedData = eip712Utils.createCoordinatorApprovalTypedData(
             signedTransaction,
-            constants.COORDINATOR_CONTRACT_ADDRESS,
+            contractAddresses.coordinator,
             txOrigin,
             new BigNumber(approvalExpirationTimeSeconds),
         );
+        const approvalHashBuff = signTypedDataUtils.generateTypedDataHash(typedData);
 
         // Since a coordinator can have multiple feeRecipientAddresses,
         // we need to make sure we issue a signature for each feeRecipientAddress
