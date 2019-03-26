@@ -408,7 +408,7 @@ describe('Coordinator server', () => {
                 ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
             );
             const orderHash = orderHashUtils.getOrderHashHex(order);
-            expect(fillResponse.body.validationErrors[0].entities).to.be.equal([orderHash]);
+            expect(fillResponse.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
         it('should return 200 OK to order cancellation request & return outstandingSignatures', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -734,6 +734,8 @@ describe('Coordinator server', () => {
             expect(response.body.validationErrors[0].code).to.be.equal(
                 ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
             );
+            const orderHash = orderHashUtils.getOrderHashHex(order);
+            expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
     });
     describe('With selective delay', () => {

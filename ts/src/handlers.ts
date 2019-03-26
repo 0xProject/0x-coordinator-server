@@ -1,7 +1,7 @@
 import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
-import { eip712Utils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
+import { eip712Utils, orderHashUtils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
@@ -10,7 +10,7 @@ import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 
-import { ValidationError, ValidationErrorCodes } from './errors';
+import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
@@ -143,44 +143,58 @@ export class Handlers {
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
     ): Promise<void> {
-        // If any orders soft-cancelled, reject request
+        // Find all soft-cancelled orders
         const softCancelledOrderHashes = await orderModel.findSoftCancelledOrdersAsync(coordinatorOrders);
-        if (softCancelledOrderHashes.length > 0) {
-            throw new ValidationError([
-                {
-                    field: 'signedTransaction.data',
-                    code: ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
-                    reason: `Cannot fill orders because some have already been soft-cancelled`,
-                    entities: softCancelledOrderHashes,
-                },
-            ]);
-        }
 
         // Takers can only request to fill an order entirely once. If they do multiple
         // partial fills, we keep track and make sure they have a sufficient partial fill
         // amount left for this request to get approved.
 
+        // Verify the fill amounts for all orders that have not been soft-cancelled
+        const availableCoordinatorOrders = _.filter(
+            coordinatorOrders,
+            o => !_.includes(softCancelledOrderHashes, orderHashUtils.getOrderHashHex(o)),
+        );
+
         // Core assumption. If signature type is `Wallet`, then takerAddress = walletContractAddress.
         const takerAddress = signedTransaction.signerAddress;
         const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
-            coordinatorOrders,
+            availableCoordinatorOrders,
             takerAddress,
         );
-        for (let i = 0; i < coordinatorOrders.length; i++) {
-            const coordinatorOrder = coordinatorOrders[i];
+        const orderHashesWithInsufficientFillAmounts = [];
+        for (let i = 0; i < availableCoordinatorOrders.length; i++) {
+            const coordinatorOrder = availableCoordinatorOrders[i];
             const orderHash = orderModel.getHash(coordinatorOrder);
             const takerAssetFillAmount = takerAssetFillAmounts[i];
             const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
             const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
             if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
-                throw new ValidationError([
-                    {
-                        field: 'signedTransaction.data',
-                        code: ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
-                        reason: `A taker can only request to fill an order fully once. This request would exceed this amount for order with hash ${orderHash}`,
-                    },
-                ]);
+                orderHashesWithInsufficientFillAmounts.push(orderHash);
             }
+        }
+        const validationErrors: ValidationErrorItem[] = [];
+        // If any soft-cancelled orders, include validation error with their orderHashes
+        if (softCancelledOrderHashes.length > 0) {
+            validationErrors.push({
+                field: 'signedTransaction.data',
+                code: ValidationErrorCodes.IncludedOrderAlreadySoftCancelled,
+                reason: `Cannot fill orders because some have already been soft-cancelled`,
+                entities: softCancelledOrderHashes,
+            });
+        }
+        // If any orders with insufficient fill amounts left, include validation error with their orderHashes
+        if (orderHashesWithInsufficientFillAmounts.length > 0) {
+            validationErrors.push({
+                field: 'signedTransaction.data',
+                code: ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
+                reason: `A taker can only request to fill an order fully once. This request includes orders which would exceed this limit.`,
+                entities: orderHashesWithInsufficientFillAmounts,
+            });
+        }
+        // If any failure conditions (soft-cancels or lacking remaining fill amounts), return the relevant errors
+        if (validationErrors.length > 0) {
+            throw new ValidationError(validationErrors);
         }
     }
     constructor(networkIdToProvider: NetworkIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
