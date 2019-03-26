@@ -296,7 +296,6 @@ export class Handlers {
                     networkId,
                 );
                 const response = await this._handleFillsAsync(
-                    decodedCalldata.functionName,
                     coordinatorOrders,
                     txOrigin,
                     signedTransaction,
@@ -467,7 +466,6 @@ export class Handlers {
         };
     }
     private async _handleFillsAsync(
-        functionName: string,
         coordinatorOrders: Order[],
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
@@ -476,13 +474,11 @@ export class Handlers {
     ): Promise<Response> {
         await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
 
-        const unsignedTransaction = utils.getUnsignedTransaction(signedTransaction);
+        const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const fillRequestReceivedEvent = {
             type: EventTypes.FillRequestReceived,
             data: {
-                functionName,
-                orders: coordinatorOrders,
-                zeroExTransaction: unsignedTransaction,
+                zeroExTransactionHash: transactionHash,
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent, networkId);

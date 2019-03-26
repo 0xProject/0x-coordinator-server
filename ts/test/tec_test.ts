@@ -6,7 +6,7 @@ import { ContractWrappers } from '@0x/contract-wrappers';
 import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
-import { assetDataUtils, orderHashUtils, SignatureType } from '@0x/order-utils';
+import { assetDataUtils, orderHashUtils, SignatureType, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import { BigNumber, fetchAsync } from '@0x/utils';
@@ -844,14 +844,11 @@ describe('Coordinator server', () => {
             // Check that received event broadcast
             const FillRequestReceivedEventMessage = await clientOnMessagePromises[0];
             const fillRequestReceivedEvent = JSON.parse(FillRequestReceivedEventMessage.data);
-            const unsignedTransaction = utils.getUnmarshalledObject(utils.getUnsignedTransaction(signedTransaction));
-            const order = utils.convertToUnsignedOrder(signedOrder);
+            const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
             const expectedFillRequestReceivedEvent: FillRequestReceivedEvent = {
                 type: EventTypes.FillRequestReceived,
                 data: {
-                    functionName: 'fillOrder',
-                    orders: [utils.getUnmarshalledObject(order)],
-                    zeroExTransaction: unsignedTransaction as ZeroExTransaction,
+                    zeroExTransactionHash: transactionHash,
                 },
             };
             expect(fillRequestReceivedEvent).to.be.deep.equal(expectedFillRequestReceivedEvent);

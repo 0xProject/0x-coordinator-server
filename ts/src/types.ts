@@ -37,9 +37,7 @@ export enum EventTypes {
 export interface FillRequestReceivedEvent {
     type: EventTypes;
     data: {
-        functionName: string;
-        orders: Order[];
-        zeroExTransaction: ZeroExTransaction;
+        zeroExTransactionHash: string;
     };
 }
 
