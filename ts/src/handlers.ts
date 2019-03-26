@@ -325,7 +325,7 @@ export class Handlers {
                         functionName: decodedCalldata.functionName,
                         orders: coordinatorOrders,
                         txOrigin,
-                        signedZeroExTransaction: signedTransaction,
+                        signedTransaction,
                         approvalSignatures: response.body.signatures,
                         approvalExpirationTimeSeconds: response.body.expirationTimeSeconds,
                     },
@@ -493,7 +493,7 @@ export class Handlers {
         const fillRequestReceivedEvent = {
             type: EventTypes.FillRequestReceived,
             data: {
-                transactionHash: transactionHash,
+                transactionHash,
             },
         };
         this._broadcastCallback(fillRequestReceivedEvent, networkId);

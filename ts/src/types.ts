@@ -47,7 +47,7 @@ export interface FillRequestAcceptedEvent {
         functionName: string;
         orders: Order[];
         txOrigin: string;
-        signedZeroExTransaction: ZeroExTransaction;
+        signedTransaction: ZeroExTransaction;
         approvalSignatures: string[];
         approvalExpirationTimeSeconds: number;
     };
