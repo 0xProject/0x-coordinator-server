@@ -336,7 +336,12 @@ export class Handlers {
 
             case ExchangeMethods.CancelOrder:
             case ExchangeMethods.BatchCancelOrders: {
-                const response = await this._handleCancelsAsync(coordinatorOrders, signedTransaction, networkId);
+                const response = await this._handleCancelsAsync(
+                    coordinatorOrders,
+                    signedTransaction,
+                    networkId,
+                    txOrigin,
+                );
                 res.status(response.status).send(response.body);
                 return;
             }
@@ -447,6 +452,7 @@ export class Handlers {
         coordinatorOrders: Order[],
         signedTransaction: SignedZeroExTransaction,
         networkId: number,
+        txOrigin: string,
     ): Promise<Response> {
         for (const order of coordinatorOrders) {
             if (signedTransaction.signerAddress !== order.makerAddress) {
@@ -472,11 +478,26 @@ export class Handlers {
             },
         };
         this._broadcastCallback(cancelRequestAccepted, networkId);
-        const outstandingSignatures = await transactionModel.getOutstandingSignaturesByOrdersAsync(coordinatorOrders);
+        const outstandingFillSignatures = await transactionModel.getOutstandingFillSignaturessByOrdersAsync(
+            coordinatorOrders,
+        );
+
+        // HACK(fabio): We want to re-use approvalSignatures for cancellation requests
+        // but they don't expire. So we hard-code `0` as the expiration
+        const ZERO = 0;
+        const response = await this._generateApprovalSignatureAsync(
+            txOrigin,
+            signedTransaction,
+            coordinatorOrders,
+            networkId,
+            ZERO,
+        );
+
         return {
             status: HttpStatus.OK,
             body: {
-                outstandingSignatures,
+                outstandingFillSignatures,
+                cancellationSignatures: response.signatures,
             },
         };
     }
@@ -508,28 +529,39 @@ export class Handlers {
             );
         }
 
-        const response = await this._generateAndStoreSignatureAsync(
+        const approvalExpirationTimeSeconds =
+            utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
+        const response = await this._generateApprovalSignatureAsync(
             txOrigin,
             signedTransaction,
             coordinatorOrders,
-            takerAssetFillAmounts,
             networkId,
+            approvalExpirationTimeSeconds,
         );
+
+        // Insert signature into DB
+        await transactionModel.createAsync(
+            transactionHash,
+            txOrigin,
+            response.signatures,
+            response.expirationTimeSeconds,
+            signedTransaction.signerAddress,
+            coordinatorOrders,
+            takerAssetFillAmounts,
+        );
+
         return {
             status: HttpStatus.OK,
             body: response,
         };
     }
-    private async _generateAndStoreSignatureAsync(
+    private async _generateApprovalSignatureAsync(
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
-        takerAssetFillAmounts: BigNumber[],
         networkId: number,
+        approvalExpirationTimeSeconds: number,
     ): Promise<RequestTransactionResponse> {
-        const approvalExpirationTimeSeconds =
-            utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
-
         const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
         const typedData = eip712Utils.createCoordinatorApprovalTypedData(
             signedTransaction,
@@ -571,18 +603,6 @@ export class Handlers {
             const approvalSignatureHex = ethUtil.addHexPrefix(signatureBuffer.toString('hex'));
             signatures.push(approvalSignatureHex);
         }
-
-        // Insert signature into DB
-        const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
-        await transactionModel.createAsync(
-            transactionHash,
-            txOrigin,
-            signatures,
-            approvalExpirationTimeSeconds,
-            signedTransaction.signerAddress,
-            coordinatorOrders,
-            takerAssetFillAmounts,
-        );
 
         return {
             signatures,

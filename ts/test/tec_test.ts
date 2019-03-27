@@ -318,8 +318,9 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
-            expect(response.body.outstandingSignatures.length).to.be.equal(0);
+            expect(response.body.outstandingFillSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingFillSignatures.length).to.be.equal(0);
+            expect(response.body.cancellationSignatures.length).to.be.equal(1);
 
             // Check that only the Coordinator order got cancelled in DB
             let isSoftCancelled = await orderModel.isSoftCancelledAsync(coordinatorOrder);
@@ -341,8 +342,9 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
-            expect(response.body.outstandingSignatures.length).to.be.equal(0);
+            expect(response.body.outstandingFillSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingFillSignatures.length).to.be.equal(0);
+            expect(response.body.cancellationSignatures.length).to.be.equal(1);
 
             // Check that orders cancelled in DB
             let isSoftCancelled = await orderModel.isSoftCancelledAsync(orderOne);
@@ -384,8 +386,9 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
-            expect(response.body.outstandingSignatures.length).to.be.equal(0);
+            expect(response.body.outstandingFillSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingFillSignatures.length).to.be.equal(0);
+            expect(response.body.cancellationSignatures.length).to.be.equal(1);
 
             // Check that order cancelled in DB
             const isSoftCancelled = await orderModel.isSoftCancelledAsync(order);
@@ -410,7 +413,7 @@ describe('Coordinator server', () => {
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(fillResponse.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
-        it('should return 200 OK to order cancellation request & return outstandingSignatures', async () => {
+        it('should return 200 OK to order cancellation request & return outstandingFillSignatures', async () => {
             const order = await orderFactory.newSignedOrderAsync();
 
             // Request to fill order
@@ -438,17 +441,18 @@ describe('Coordinator server', () => {
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
-            expect(response.body.outstandingSignatures.length).to.be.equal(1);
-            expect(response.body.outstandingSignatures[0].approvalSignatures[0]).to.be.equal(
+            expect(response.body.outstandingFillSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingFillSignatures.length).to.be.equal(1);
+            expect(response.body.outstandingFillSignatures[0].approvalSignatures[0]).to.be.equal(
                 fillResponse.body.signatures[0],
             );
-            expect(response.body.outstandingSignatures[0].expirationTimeSeconds).to.be.equal(
+            expect(response.body.outstandingFillSignatures[0].expirationTimeSeconds).to.be.equal(
                 fillResponse.body.expirationTimeSeconds,
             );
-            expect(response.body.outstandingSignatures[0].takerAssetFillAmount).to.be.bignumber.equal(
+            expect(response.body.outstandingFillSignatures[0].takerAssetFillAmount).to.be.bignumber.equal(
                 takerAssetFillAmount,
             );
+            expect(response.body.cancellationSignatures.length).to.be.equal(1);
         });
         it('should return 400 if request specifies unsupported networkId', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -796,8 +800,9 @@ describe('Coordinator server', () => {
                     .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                     .send(cancelBody);
                 expect(response.status).to.be.equal(HttpStatus.OK);
-                expect(response.body.outstandingSignatures).to.be.instanceOf(Array);
-                expect(response.body.outstandingSignatures.length).to.be.equal(0);
+                expect(response.body.outstandingFillSignatures).to.be.instanceOf(Array);
+                expect(response.body.outstandingFillSignatures.length).to.be.equal(0);
+                expect(response.body.cancellationSignatures.length).to.be.equal(1);
 
                 configs.SELECTIVE_DELAY_MS = selectiveDelayMs; // Reset the selective delay at end of test
             })();

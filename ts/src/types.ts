@@ -69,7 +69,7 @@ export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEve
 
 export type BroadcastCallback = (message: BroadcastMessage, networkId: number) => void;
 
-export interface OutstandingSignature {
+export interface OutstandingFillSignatures {
     approvalSignatures: string[];
     expirationTimeSeconds: number;
     orderHash: string;

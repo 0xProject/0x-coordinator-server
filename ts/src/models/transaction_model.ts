@@ -7,7 +7,7 @@ import { OrderEntity } from '../entities/order_entity';
 import { TakerAssetFillAmountEntity } from '../entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../entities/transaction_entity';
 import { takerAssetFillAmountModel } from '../models/taker_asset_fill_amount_model';
-import { OrderHashToFillAmount, OutstandingSignature } from '../types';
+import { OrderHashToFillAmount, OutstandingFillSignatures } from '../types';
 import { utils } from '../utils';
 
 import { orderModel } from './order_model';
@@ -127,10 +127,10 @@ export const transactionModel = {
         }
         return orderHashToFillAmount;
     },
-    async getOutstandingSignaturesByOrdersAsync(coordinatorOrders: Order[]): Promise<OutstandingSignature[]> {
+    async getOutstandingFillSignaturessByOrdersAsync(coordinatorOrders: Order[]): Promise<OutstandingFillSignatures[]> {
         const coordinatorOrderHashes = _.map(coordinatorOrders, o => orderModel.getHash(o));
         const transactions = await transactionModel.findByOrdersAsync(coordinatorOrders, { isExpired: false });
-        const outstandingSignatures: OutstandingSignature[] = [];
+        const outstandingFillSignatures: OutstandingFillSignatures[] = [];
         _.each(transactions, transaction => {
             _.each(transaction.orders, order => {
                 if (_.includes(coordinatorOrderHashes, order.hash)) {
@@ -142,7 +142,7 @@ export const transactionModel = {
                             }`,
                         );
                     }
-                    outstandingSignatures.push({
+                    outstandingFillSignatures.push({
                         orderHash: order.hash,
                         approvalSignatures: JSON.parse(transaction.approvalSignatures),
                         expirationTimeSeconds: transaction.expirationTimeSeconds,
@@ -151,6 +151,6 @@ export const transactionModel = {
                 }
             });
         });
-        return outstandingSignatures;
+        return outstandingFillSignatures;
     },
 };
