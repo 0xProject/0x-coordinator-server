@@ -9,7 +9,7 @@
 
 ## Introduction
 
-A reference server implementation of a soft-cancellation Coordinator.
+A reference server implementation of a soft-cancellation Coordinator. To learn more about coordinators, check out the [coordinator specification](https://github.com/0xProject/0x-protocol-specification/blob/master/v2/coordinator-specification.md).
 
 Fork this repository to get started!
 
