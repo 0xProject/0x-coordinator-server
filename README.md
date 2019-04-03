@@ -81,7 +81,9 @@ Otherwise the database schema will be auto-created on every application launch. 
 
 ## Deployment
 
-`0x-coordinator-server` ships as a docker container. First, install Docker ([mac](https://docs.docker.com/docker-for-mac/install/), [windows](https://docs.docker.com/docker-for-windows/install/)). To build the image run:
+`0x-coordinator-server` ships as a docker container. First, install Docker ([mac](https://docs.docker.com/docker-for-mac/install/), [windows](https://docs.docker.com/docker-for-windows/install/)). Before you can build the image, make sure you've edited your configs as outlined in step 5.
+
+To build the image run:
 
 ```sh
 docker build -t 0x-coordinator-server .
