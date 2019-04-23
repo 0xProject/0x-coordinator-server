@@ -1,5 +1,5 @@
 {
-    "name": "0x-coordinator-server",
+    "name": "@0x/coordinator-server",
     "version": "0.0.1",
     "description": "0x Coordinator reference server implementation",
     "repository": "git@github.com:0xProject/0x-coordinator-server.git",
