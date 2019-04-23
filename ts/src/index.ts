@@ -3,17 +3,26 @@ import '@babel/polyfill';
 import * as _ from 'lodash';
 import 'reflect-metadata';
 
+import { configs as testConfigs } from '../test/test_configs';
+
 import { getAppAsync } from './app';
 import { assertConfigsAreValid } from './assertions';
-import { configs } from './production_configs';
+import { configs  as productionConfigs } from './production_configs';
 import { NetworkIdToProvider, NetworkSpecificSettings } from './types';
 import { utils } from './utils';
 
+export { getAppAsync };
+
+export const configs = {
+    production: productionConfigs,
+    test: testConfigs,
+};
+
 (async () => {
-    assertConfigsAreValid(configs);
+    assertConfigsAreValid(productionConfigs);
 
     const networkIdToProvider: NetworkIdToProvider = {};
-    _.each(configs.NETWORK_ID_TO_SETTINGS, (settings: NetworkSpecificSettings, networkIdStr: string) => {
+    _.each(productionConfigs.NETWORK_ID_TO_SETTINGS, (settings: NetworkSpecificSettings, networkIdStr: string) => {
         const providerEngine = new Web3ProviderEngine();
         const rpcSubprovider = new RPCSubprovider(settings.RPC_URL);
         providerEngine.addProvider(rpcSubprovider);
@@ -23,9 +32,9 @@ import { utils } from './utils';
         networkIdToProvider[networkId] = providerEngine;
     });
 
-    const app = await getAppAsync(networkIdToProvider, configs);
+    const app = await getAppAsync(networkIdToProvider, productionConfigs);
 
-    app.listen(configs.HTTP_PORT, () => {
-        utils.log(`Coordinator SERVER API (HTTP) listening on port ${configs.HTTP_PORT}!`);
+    app.listen(productionConfigs.HTTP_PORT, () => {
+        utils.log(`Coordinator SERVER API (HTTP) listening on port ${productionConfigs.HTTP_PORT}!`);
     });
 })().catch(utils.log);

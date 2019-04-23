@@ -36,6 +36,8 @@ export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, conf
     const supportedNetworkIds = utils.getSupportedNetworkIds(configs);
     app.use(urlParamsParsing.bind(undefined, supportedNetworkIds));
 
+    app.get('/v1/ping', (_, res) => res.send('pong')); // tslint:disable-line:no-shadowed-variable
+
     /**
      * POST endpoint for requesting signatures for a 0x transaction
      */

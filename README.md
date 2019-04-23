@@ -41,7 +41,7 @@ To develop ontop of `0x-coordinator-server`, follow the following instructions:
 -   `EXPIRATION_DURATION_SECONDS` - How long an issued signature should be valid for. This value should be long enough for someone to concievably fill an order, but short enough where off-chain cancellations take effect after some reasonable upper-bound.
 -   `RPC_URL` - The backing Ethereum node to use for JSON RPC queries. Please add your **own** Infura API key if using Infura.
 
-5. Build the project
+6. Build the project
 
     ```sh
     yarn build
@@ -53,7 +53,7 @@ To develop ontop of `0x-coordinator-server`, follow the following instructions:
     yarn watch
     ```
 
-6. Start the Coordinator server
+7. Start the Coordinator server
 
     ```sh
     yarn start
@@ -81,7 +81,7 @@ Otherwise the database schema will be auto-created on every application launch. 
 
 ## Deployment
 
-`0x-coordinator-server` ships as a docker container. First, install Docker ([mac](https://docs.docker.com/docker-for-mac/install/), [windows](https://docs.docker.com/docker-for-windows/install/)). Before you can build the image, make sure you've edited your configs as outlined in step 5.
+`0x-coordinator-server` ships as a docker container. First, install Docker ([mac](https://docs.docker.com/docker-for-mac/install/), [windows](https://docs.docker.com/docker-for-windows/install/)). Before you can build the image, make sure you've edited your configs as outlined in step 5 of [Pre-Requirements](#pre-requirements).
 
 To build the image run:
 

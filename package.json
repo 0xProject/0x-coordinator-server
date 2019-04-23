@@ -4,6 +4,7 @@
     "description": "0x Coordinator reference server implementation",
     "repository": "git@github.com:0xProject/0x-coordinator-server.git",
     "license": "Apache-2.0",
+    "main": "ts/lib/src/index.js",
     "scripts": {
         "build": "tsc -p ts/tsconfig.json",
         "watch": "tsc -w -p ts/tsconfig.json",
