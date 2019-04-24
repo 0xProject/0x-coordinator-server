@@ -5,6 +5,7 @@
     "repository": "git@github.com:0xProject/0x-coordinator-server.git",
     "license": "Apache-2.0",
     "main": "ts/lib/src/index.js",
+    "types": "ts/lib/src/types.ts",
     "scripts": {
         "build": "tsc -p ts/tsconfig.json",
         "watch": "tsc -w -p ts/tsconfig.json",
