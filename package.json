@@ -1,6 +1,6 @@
 {
     "name": "@0x/coordinator-server",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "description": "0x Coordinator reference server implementation",
     "repository": "git@github.com:0xProject/0x-coordinator-server.git",
     "license": "Apache-2.0",
