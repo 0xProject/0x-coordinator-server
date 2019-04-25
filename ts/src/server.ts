@@ -3,11 +3,9 @@ import '@babel/polyfill';
 import * as _ from 'lodash';
 import 'reflect-metadata';
 
-// import { configs } from './production_configs';
-import { configs } from '../test/test_configs';
-
 import { getAppAsync } from './app';
 import { assertConfigsAreValid } from './assertions';
+import { configs } from './production_configs';
 import { NetworkIdToProvider, NetworkSpecificSettings } from './types';
 import { utils } from './utils';
 

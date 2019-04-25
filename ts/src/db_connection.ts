@@ -1,9 +1,7 @@
 import * as _ from 'lodash';
 import { Connection, ConnectionOptions, createConnection } from 'typeorm';
 
-import { OrderEntity } from './entities/order_entity';
-import { TakerAssetFillAmountEntity } from './entities/taker_asset_fill_amount_entity';
-import { TransactionEntity } from './entities/transaction_entity';
+import { config } from './default_ormconfig';
 
 let connectionIfExists: Connection | undefined;
 
@@ -32,18 +30,6 @@ export async function initDBConnectionAsync(options?: ConnectionOptions): Promis
     if (!_.isUndefined(connectionIfExists)) {
         throw new Error('DB connection already exists');
     }
-    let connOptions = options;
-    if (connOptions === undefined) {
-        connOptions = {
-            type: 'sqlite',
-            database: 'database.sqlite',
-            synchronize: true,
-            logging: true,
-            entities: [OrderEntity, TakerAssetFillAmountEntity, TransactionEntity],
-            cli: {
-                entitiesDir: './entities',
-            },
-        };
-    }
+    const connOptions = options === undefined ? config : options;
     connectionIfExists = await createConnection(connOptions);
 }
