@@ -10,7 +10,7 @@
         "build": "tsc -p ts/tsconfig.json",
         "watch": "tsc -w -p ts/tsconfig.json",
         "prettier": "prettier --write 'ts/**/*.ts' --config .prettierrc",
-        "start": "node ts/lib/src/index.js",
+        "start": "node ts/lib/src/server.js",
         "lint": "tslint --project ts --format stylish --exclude ts/src/schemas/**/*",
         "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 6000 --exit",
         "update_snapshot": "cross-env download --extract --strip 1 --out 0x_ganache_snapshot ${npm_package_config_snapshot_url}",

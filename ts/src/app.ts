@@ -5,6 +5,7 @@ import * as asyncHandler from 'express-async-handler';
 import * as http from 'http';
 import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
+import { ConnectionOptions } from 'typeorm';
 import * as WebSocket from 'websocket';
 
 import { assertConfigsAreValid } from './assertions';
@@ -23,10 +24,14 @@ const networkIdToConnectionStore: NetworkIdToConnectionStore = {};
  * Creates a new express app/server
  * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing coordinator approvals
  */
-export async function getAppAsync(networkIdToProvider: NetworkIdToProvider, configs: Configs): Promise<http.Server> {
+export async function getAppAsync(
+    networkIdToProvider: NetworkIdToProvider,
+    configs: Configs,
+    dbConfigs?: ConnectionOptions,
+): Promise<http.Server> {
     assertConfigsAreValid(configs);
     if (!hasDBConnection()) {
-        await initDBConnectionAsync();
+        await initDBConnectionAsync(dbConfigs);
     }
 
     const handlers = new Handlers(networkIdToProvider, configs, broadcastCallback);
