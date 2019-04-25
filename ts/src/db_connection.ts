@@ -1,5 +1,7 @@
 import * as _ from 'lodash';
-import { Connection, createConnection } from 'typeorm';
+import { Connection, ConnectionOptions, createConnection } from 'typeorm';
+
+import { defaultConnectionOptions } from './default_ormconfig';
 
 let connectionIfExists: Connection | undefined;
 
@@ -24,9 +26,10 @@ export function getDBConnection(): Connection {
 /**
  * Creates the DB connnection to use in an app
  */
-export async function initDBConnectionAsync(): Promise<void> {
+export async function initDBConnectionAsync(options?: ConnectionOptions): Promise<void> {
     if (!_.isUndefined(connectionIfExists)) {
         throw new Error('DB connection already exists');
     }
-    connectionIfExists = await createConnection();
+    const connOptions = options === undefined ? defaultConnectionOptions : options;
+    connectionIfExists = await createConnection(connOptions);
 }
