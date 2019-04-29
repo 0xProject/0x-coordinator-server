@@ -38,7 +38,7 @@ enum ExchangeMethods {
     MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
     MarketBuyOrders = 'marketBuyOrders',
     MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
-    MatchOrders = 'matchOrders',
+
     CancelOrder = 'cancelOrder',
     BatchCancelOrders = 'batchCancelOrders',
 }
