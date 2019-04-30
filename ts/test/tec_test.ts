@@ -351,6 +351,34 @@ describe('Coordinator server', () => {
             isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
             expect(isSoftCancelled).to.be.true();
         });
+        it('should return 200 OK if request to batchCancel 2 orders each with a different, supported feeRecipientAddress', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync({
+                feeRecipientAddress: FEE_RECIPIENT_ADDRESS_ONE,
+            });
+            const orderTwo = await orderFactory.newSignedOrderAsync({
+                feeRecipientAddress: FEE_RECIPIENT_ADDRESS_TWO,
+            });
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.batchCancelOrdersTx([orderOne, orderTwo]);
+            const signedTransaction = createSignedTransaction(data, makerAddress);
+            const body = {
+                signedTransaction,
+                txOrigin: makerAddress,
+            };
+            const response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.outstandingFillSignatures).to.be.instanceOf(Array);
+            expect(response.body.outstandingFillSignatures.length).to.be.equal(0);
+            expect(response.body.cancellationSignatures.length).to.be.equal(2);
+
+            // Check that orders cancelled in DB
+            let isSoftCancelled = await orderModel.isSoftCancelledAsync(orderOne);
+            expect(isSoftCancelled).to.be.true();
+            isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
+            expect(isSoftCancelled).to.be.true();
+        });
         it('should return 400 and leave order uncancelled if non-maker tried to cancel an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
