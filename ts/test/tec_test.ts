@@ -1,12 +1,11 @@
 import { CoordinatorContract } from '@0x/abi-gen-wrappers';
-import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { Coordinator as CoordinatorArtifact } from '@0x/contract-artifacts';
 import { ContractWrappers } from '@0x/contract-wrappers';
 import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
-import { assetDataUtils, orderHashUtils, SignatureType, transactionHashUtils } from '@0x/order-utils';
+import { assetDataUtils, orderCalculationUtils, orderHashUtils, SignatureType, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import { BigNumber, fetchAsync } from '@0x/utils';
@@ -662,7 +661,7 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
                 t => t.orderHash === orderHashOne,
             ) as TakerAssetFillAmountEntity;
-            const expectedOrderOneMakerAssetFillAmount = orderUtils.getMakerFillAmount(
+            const expectedOrderOneMakerAssetFillAmount = orderCalculationUtils.getMakerFillAmount(
                 orderOne,
                 takerAssetFillAmountOne.takerAssetFillAmount,
             );
@@ -673,7 +672,7 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
                 t => t.orderHash === orderHashTwo,
             ) as TakerAssetFillAmountEntity;
-            const expectedOrderTwoMakerAssetFillAmount = orderUtils.getMakerFillAmount(
+            const expectedOrderTwoMakerAssetFillAmount = orderCalculationUtils.getMakerFillAmount(
                 orderOne,
                 takerAssetFillAmountTwo.takerAssetFillAmount,
             );
