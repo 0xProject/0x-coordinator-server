@@ -1,7 +1,6 @@
-import { orderUtils } from '@0x/asset-buyer/lib/src/utils/order_utils';
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
-import { eip712Utils, orderHashUtils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
+import { eip712Utils, orderCalculationUtils, orderHashUtils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
@@ -68,7 +67,7 @@ export class Handlers {
 
         // Calculate min of balance & allowance of maker's makerAsset -> translate into takerAsset amount
         const maxMakerAssetFillAmount = BigNumber.min(traderInfo.makerBalance, traderInfo.makerAllowance);
-        const maxTakerAssetFillAmountGivenMakerConstraints = orderUtils.getTakerFillAmount(
+        const maxTakerAssetFillAmountGivenMakerConstraints = orderCalculationUtils.getTakerFillAmount(
             signedOrder,
             maxMakerAssetFillAmount,
         );
@@ -424,7 +423,7 @@ export class Handlers {
                         signedOrder,
                         orderAndTraderInfo,
                     );
-                    const totalTakerAssetAmountAtOrderExchangeRate = orderUtils.getTakerFillAmount(
+                    const totalTakerAssetAmountAtOrderExchangeRate = orderCalculationUtils.getTakerFillAmount(
                         signedOrder,
                         totalMakerAssetAmount,
                     );
@@ -437,7 +436,7 @@ export class Handlers {
                     const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(
                         takerAssetFillAmount,
                     );
-                    totalMakerAssetAmount = orderUtils.getMakerFillAmount(signedOrder, remainingTotalTakerAssetAmount);
+                    totalMakerAssetAmount = orderCalculationUtils.getMakerFillAmount(signedOrder, remainingTotalTakerAssetAmount);
                     takerAssetFillAmounts.push(takerAssetFillAmount);
                 });
                 break;
