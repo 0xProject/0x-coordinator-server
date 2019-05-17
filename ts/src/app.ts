@@ -88,7 +88,7 @@ export async function getAppAsync(
                     },
                 ],
             };
-            request.reject(400, body);
+            request.reject(400, JSON.stringify(body));
             return;
         }
 
