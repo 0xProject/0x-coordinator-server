@@ -59,6 +59,11 @@ export async function getAppAsync(
      */
     app.post('/v1/request_transaction', asyncHandler(handlers.postRequestTransactionAsync.bind(handlers)));
 
+    /**
+     * POST endpoint for checking whether order hashes have been soft-cancelled or not
+     */
+    app.post('/v1/soft_cancels', asyncHandler(handlers.postSoftCancelsAsync.bind(handlers)));
+
     app.use(errorHandler);
 
     /**
