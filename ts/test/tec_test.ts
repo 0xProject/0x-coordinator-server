@@ -858,14 +858,14 @@ describe('Coordinator server', () => {
         });
         it('should return 200 OK & empty array if no soft cancelled order hashes could be found', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
-            const invalidBody = {
+            const requestBody = {
                 orderHashes: [
                     orderModel.getHash(orderOne)
                 ]
             };
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
-                .send(invalidBody);
+                .send(requestBody);
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.orderHashes).to.be.instanceOf(Array);
             expect(response.body.orderHashes.length).to.be.equal(0);
