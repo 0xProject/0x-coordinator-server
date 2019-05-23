@@ -856,7 +856,7 @@ describe('Coordinator server', () => {
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.RequiredField);
             expect(response.body.validationErrors[0].field).to.be.equal('orderHashes');
         });
-        it('should return 404 Not Found if no soft cancelled order hashes could be found', async () => {
+        it('should return 200 OK & empty array if no soft cancelled order hashes could be found', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const invalidBody = {
                 orderHashes: [
@@ -866,8 +866,9 @@ describe('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
                 .send(invalidBody);
-            expect(response.status).to.be.equal(HttpStatus.NOT_FOUND);
-            expect(response.text).to.be.equal('NOT_FOUND');
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.orderHashes).to.be.instanceOf(Array);
+            expect(response.body.orderHashes.length).to.be.equal(0);
         });
         it('should return 200 OK & return a list of order hashes that are soft cancelled', async () => {
             // Generate 4 orders, and soft cancel 3 of them

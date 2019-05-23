@@ -354,15 +354,9 @@ export class Handlers {
         utils.validateSchema(req.body, softCancelsSchema);
         
         const softCancelsFound = await orderModel.findSoftCancelledOrdersByHashAsync(req.body.orderHashes);
-
-        if (!softCancelsFound.length) {
-            res.status(HttpStatus.NOT_FOUND).send('NOT_FOUND');
-        }
-        else {
-            res.status(HttpStatus.OK).send({
-                orderHashes: softCancelsFound
-            });
-        }
+        res.status(HttpStatus.OK).send({
+            orderHashes: softCancelsFound
+        });
     }
     private async _getTakerAssetFillAmountsFromDecodedCalldataAsync(
         decodedCalldata: DecodedCalldata,

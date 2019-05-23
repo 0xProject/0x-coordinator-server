@@ -29,7 +29,8 @@ export const orderModel = {
     },
     async findSoftCancelledOrdersAsync(orders: Order[]): Promise<string[]> {
         const orderHashes = _.map(orders, order => orderModel.getHash(order));
-        return orderModel.findSoftCancelledOrdersByHashAsync(orderHashes);
+        const softCancelledOrders = await orderModel.findSoftCancelledOrdersByHashAsync(orderHashes);
+        return softCancelledOrders;
     },
     async findSoftCancelledOrdersByHashAsync(orderHashes: string[]): Promise<string[]> {
         const connection = getDBConnection();
