@@ -192,7 +192,7 @@ describe('Coordinator server', () => {
     afterEach(async () => {
         await blockchainLifecycle.revertAsync();
     });
-    describe('#/v1/config', () => {
+    describe('#/v1/configuration', () => {
         before(async () => {
             app = await getAppAsync(
                 {
