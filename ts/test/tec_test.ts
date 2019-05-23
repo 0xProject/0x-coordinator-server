@@ -75,6 +75,7 @@ let wsClient: WebSocket.w3cwebsocket;
 // Shared
 const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
 const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
+const HTTP_CONFIG_ENDPOINT_PATH = `/v1/configuration`;
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
@@ -190,6 +191,25 @@ describe('Coordinator server', () => {
     });
     afterEach(async () => {
         await blockchainLifecycle.revertAsync();
+    });
+    describe('#/v1/configuration', () => {
+        before(async () => {
+            app = await getAppAsync(
+                {
+                    [NETWORK_ID]: provider,
+                },
+                configs,
+            );
+        });
+        it('should return coordinator configuration', async () => {
+            const response = await request(app).get(HTTP_CONFIG_ENDPOINT_PATH);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.expirationDurationSeconds).to.be.equal(configs.EXPIRATION_DURATION_SECONDS);
+            expect(response.body.selectiveDelayMs).to.be.equal(configs.SELECTIVE_DELAY_MS);
+            expect(response.body.supportedNetworkIds).to.be.instanceOf(Array);
+            expect(response.body.supportedNetworkIds).to.have.length(1);
+            expect(response.body.supportedNetworkIds[0]).to.be.equal(NETWORK_ID);
+        });
     });
     describe('#/v1/request_transaction', () => {
         before(async () => {

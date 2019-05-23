@@ -44,6 +44,17 @@ export async function getAppAsync(
     app.get('/v1/ping', (_, res) => res.send('pong')); // tslint:disable-line:no-shadowed-variable
 
     /**
+     * GET endpoint for requesting current coordination server configuration
+     */
+    app.get('/v1/configuration', ({}, response: express.Response) => {
+        response.send({
+            expirationDurationSeconds: configs.EXPIRATION_DURATION_SECONDS,
+            selectiveDelayMs: configs.SELECTIVE_DELAY_MS,
+            supportedNetworkIds: supportedNetworkIds
+        }).end();
+    });
+
+    /**
      * POST endpoint for requesting signatures for a 0x transaction
      */
     app.post('/v1/request_transaction', asyncHandler(handlers.postRequestTransactionAsync.bind(handlers)));
