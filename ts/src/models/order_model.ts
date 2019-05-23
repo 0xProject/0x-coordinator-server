@@ -29,6 +29,9 @@ export const orderModel = {
     },
     async findSoftCancelledOrdersAsync(orders: Order[]): Promise<string[]> {
         const orderHashes = _.map(orders, order => orderModel.getHash(order));
+        return orderModel.findSoftCancelledOrdersByHashAsync(orderHashes);
+    },
+    async findSoftCancelledOrdersByHashAsync(orderHashes: string[]): Promise<string[]> {
         const connection = getDBConnection();
         const query = connection
             .getRepository(OrderEntity)

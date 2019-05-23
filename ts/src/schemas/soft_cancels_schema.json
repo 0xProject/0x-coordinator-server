@@ -1,0 +1,10 @@
+{
+    "id": "/softCancelsSchema",
+    "properties": {
+        "orderHashes": {
+            "type": "array"
+        }
+    },
+    "required": ["orderHashes"],
+    "type": "object"
+}

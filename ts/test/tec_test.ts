@@ -75,6 +75,7 @@ let wsClient: WebSocket.w3cwebsocket;
 // Shared
 const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
 const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
+const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v1/soft_cancels?networkId=${NETWORK_ID}`;
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
@@ -833,6 +834,78 @@ describe('Coordinator server', () => {
 
                 configs.SELECTIVE_DELAY_MS = selectiveDelayMs; // Reset the selective delay at end of test
             })();
+        });
+    });
+    describe('#/v1/soft_cancels', () => {
+        before(async () => {
+            app = await getAppAsync(
+                {
+                    [NETWORK_ID]: provider,
+                },
+                configs,
+            );
+        });
+        it('should return 400 Bad Request if request body does not conform to schema', async () => {
+            const invalidBody = {
+            };
+            const response = await request(app)
+                .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
+                .send(invalidBody);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.RequiredField);
+            expect(response.body.validationErrors[0].field).to.be.equal('orderHashes');
+        });
+        it('should return 404 Not Found if no soft cancelled order hashes could be found', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync();
+            const invalidBody = {
+                orderHashes: [
+                    orderModel.getHash(orderOne)
+                ]
+            };
+            const response = await request(app)
+                .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
+                .send(invalidBody);
+            expect(response.status).to.be.equal(HttpStatus.NOT_FOUND);
+            expect(response.text).to.be.equal('NOT_FOUND');
+        });
+        it('should return 200 OK & return a list of order hashes that are soft cancelled', async () => {
+            // Generate 4 orders, and soft cancel 3 of them
+            const orderOne = await orderFactory.newSignedOrderAsync();
+            const orderTwo = await orderFactory.newSignedOrderAsync();
+            const orderThree = await orderFactory.newSignedOrderAsync();
+            const orderFour = await orderFactory.newSignedOrderAsync();
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const cancelTxData = transactionEncoder.batchCancelOrdersTx([orderOne, orderTwo, orderThree]);
+            const signedTransaction = createSignedTransaction(cancelTxData, makerAddress);
+            const body = {
+                signedTransaction,
+                txOrigin: makerAddress,
+            };
+            await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+
+            const orderHashes = [
+                orderModel.getHash(orderOne),
+                orderModel.getHash(orderTwo),
+                orderModel.getHash(orderThree),
+                orderModel.getHash(orderFour)
+            ];
+            
+            const response = await request(app)
+                .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
+                .send({
+                    orderHashes: orderHashes
+                });
+
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.orderHashes).to.be.instanceOf(Array);
+            expect(response.body.orderHashes.length).to.be.equal(3);
+            expect(response.body.orderHashes).to.contain(orderHashes[0]);
+            expect(response.body.orderHashes).to.contain(orderHashes[1]);
+            expect(response.body.orderHashes).to.contain(orderHashes[2]);
+            expect(response.body.orderHashes).to.not.contain(orderHashes[3]);
         });
     });
     describe(WS_NOTIFICATION_ENDPOINT_PATH, () => {

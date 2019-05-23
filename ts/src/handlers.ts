@@ -13,6 +13,7 @@ import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './er
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
+import * as softCancelsSchema from './schemas/soft_cancels_schema.json';
 import {
     BroadcastCallback,
     Configs,
@@ -347,6 +348,20 @@ export class Handlers {
 
             default:
                 throw utils.getInvalidFunctionCallError(decodedCalldata.functionName);
+        }
+    }
+    public async postSoftCancelsAsync(req: express.Request, res: express.Response): Promise<void> {
+        utils.validateSchema(req.body, softCancelsSchema);
+        
+        const softCancelsFound = await orderModel.findSoftCancelledOrdersByHashAsync(req.body.orderHashes);
+
+        if (!softCancelsFound.length) {
+            res.status(HttpStatus.NOT_FOUND).send('NOT_FOUND');
+        }
+        else {
+            res.status(HttpStatus.OK).send({
+                orderHashes: softCancelsFound
+            });
         }
     }
     private async _getTakerAssetFillAmountsFromDecodedCalldataAsync(
