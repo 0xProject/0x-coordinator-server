@@ -9,11 +9,14 @@ export class TakerAssetFillAmountEntity {
     @PrimaryGeneratedColumn()
     public id!: number;
 
-    @Column({ type: 'numeric', transformer: bigNumberTransformer })
+    @Column({ type: 'decimal', precision: 30, scale: 0, transformer: bigNumberTransformer })
     public takerAssetFillAmount!: BigNumber;
 
     @Column()
     public orderHash!: string;
+
+    @Column()
+    public expirationTimeSeconds!: number;
 
     @ManyToOne(_type => TransactionEntity, transaction => transaction.takerAssetFillAmounts)
     public transaction!: TransactionEntity;

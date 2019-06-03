@@ -22,4 +22,6 @@ export const configs = {
         process.env.EXPIRATION_DURATION_SECONDS === undefined
             ? 60
             : _.parseInt(process.env.EXPIRATION_DURATION_SECONDS), // 1 minute
+    // Optional reserved fill slots
+    RESERVED_FILL_SLOTS: process.env.RESERVED_FILL_SLOTS === undefined ? true : process.env.RESERVED_FILL_SLOTS == "true"
 };

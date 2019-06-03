@@ -9,6 +9,7 @@ export interface Configs {
     NETWORK_ID_TO_SETTINGS: NetworkIdToNetworkSpecificSettings;
     SELECTIVE_DELAY_MS: number;
     EXPIRATION_DURATION_SECONDS: number;
+    RESERVED_FILL_SLOTS: boolean;
 }
 
 export interface RequestTransactionResponse {

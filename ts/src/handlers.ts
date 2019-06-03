@@ -12,6 +12,7 @@ import * as _ from 'lodash';
 import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
 import { orderModel } from './models/order_model';
 import { transactionModel } from './models/transaction_model';
+import { takerAssetFillAmountModel } from './models/taker_asset_fill_amount_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
 import * as softCancelsSchema from './schemas/soft_cancels_schema.json';
 import {
@@ -20,6 +21,7 @@ import {
     EventTypes,
     NetworkIdToContractWrappers,
     NetworkIdToProvider,
+    OrderHashToFillAmount,
     RequestTransactionResponse,
     Response,
 } from './types';
@@ -142,6 +144,7 @@ export class Handlers {
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
+        checkReservedFillSlots: boolean,
     ): Promise<void> {
         // Find all soft-cancelled orders
         const softCancelledOrderHashes = await orderModel.findSoftCancelledOrdersAsync(coordinatorOrders);
@@ -162,15 +165,30 @@ export class Handlers {
             availableCoordinatorOrders,
             takerAddress,
         );
+
+        // If the server is using reserved fill slots then the total amount unavailable will be the sum of these.
+        let reservedOrderHashToFillAmount: OrderHashToFillAmount = {};
+        if (checkReservedFillSlots === true) {
+            reservedOrderHashToFillAmount = await takerAssetFillAmountModel.getOrderHashToFillAmountReservedAsync(
+                availableCoordinatorOrders,
+            );
+        }
+
         const orderHashesWithInsufficientFillAmounts = [];
+        const orderHashesWithReservedFillAmounts = [];
         for (let i = 0; i < availableCoordinatorOrders.length; i++) {
             const coordinatorOrder = availableCoordinatorOrders[i];
             const orderHash = orderModel.getHash(coordinatorOrder);
             const takerAssetFillAmount = takerAssetFillAmounts[i];
             const previouslyRequestedFillAmount = orderHashToFillAmount[orderHash] || new BigNumber(0);
+            const reservedRequestedFillAmount = checkReservedFillSlots && reservedOrderHashToFillAmount[orderHash] || new BigNumber(0);
             const totalRequestedFillAmount = previouslyRequestedFillAmount.plus(takerAssetFillAmount);
             if (totalRequestedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
                 orderHashesWithInsufficientFillAmounts.push(orderHash);
+            }
+            const totalReservedFillAmount = totalRequestedFillAmount.plus(reservedRequestedFillAmount);
+            if (totalReservedFillAmount.gt(coordinatorOrder.takerAssetAmount)) {
+                orderHashesWithReservedFillAmounts.push(orderHash);
             }
         }
         const validationErrors: ValidationErrorItem[] = [];
@@ -190,6 +208,15 @@ export class Handlers {
                 code: ValidationErrorCodes.FillRequestsExceededTakerAssetAmount,
                 reason: `A taker can only request to fill an order fully once. This request includes orders which would exceed this limit.`,
                 entities: orderHashesWithInsufficientFillAmounts,
+            });
+        }
+        // If any orders with overlap with reserved fill amounts, include validation error with their orderHashes
+        if (orderHashesWithReservedFillAmounts.length > 0) {
+            validationErrors.push({
+                field: 'signedTransaction.data',
+                code: ValidationErrorCodes.FillRequestsExceededReservedTakerAssetAmount,
+                reason: `A taker can only request to fill fully reserved order once it's reserved amounts expire.`,
+                entities: orderHashesWithReservedFillAmounts,
             });
         }
         // If any failure conditions (soft-cancels or lacking remaining fill amounts), return the relevant errors
@@ -516,7 +543,12 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<Response> {
-        await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
+        await Handlers._validateFillsAllowedOrThrowAsync(
+            signedTransaction, 
+            coordinatorOrders, 
+            takerAssetFillAmounts, 
+            this._configs.RESERVED_FILL_SLOTS
+        );
 
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const fillRequestReceivedEvent = {
@@ -534,6 +566,7 @@ export class Handlers {
                 signedTransaction,
                 coordinatorOrders,
                 takerAssetFillAmounts,
+                this._configs.RESERVED_FILL_SLOTS
             );
         }
 

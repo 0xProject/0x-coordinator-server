@@ -90,6 +90,7 @@ export const transactionModel = {
             const takerAssetFillAmountEntity = await takerAssetFillAmountModel.createAsync(
                 orderEntityIfExists,
                 fillAmount,
+                expirationTimeSeconds,
             );
             takerAssetFillAmountEntities.push(takerAssetFillAmountEntity);
         }

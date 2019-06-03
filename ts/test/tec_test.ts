@@ -55,6 +55,8 @@ let web3Wrapper: Web3Wrapper;
 let owner: string;
 let makerAddress: string;
 let takerAddress: string;
+let takerAddressTwo: string;
+let takerAddressThree: string;
 let feeRecipientAddress: string;
 let makerTokenContract: DummyERC20TokenContract;
 let takerTokenContract: DummyERC20TokenContract;
@@ -93,7 +95,7 @@ describe('Coordinator server', () => {
 
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
-        [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
+        [owner, makerAddress, takerAddress, feeRecipientAddress, takerAddressTwo, takerAddressThree] = _.slice(accounts, 0, 8);
 
         contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
         const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
@@ -210,6 +212,7 @@ describe('Coordinator server', () => {
             expect(response.body.supportedNetworkIds).to.be.instanceOf(Array);
             expect(response.body.supportedNetworkIds).to.have.length(1);
             expect(response.body.supportedNetworkIds[0]).to.be.equal(NETWORK_ID);
+            expect(response.body.reservedFillSlots).to.be.equal(configs.RESERVED_FILL_SLOTS);
         });
     });
     describe('#/v1/request_transaction', () => {
@@ -788,6 +791,136 @@ describe('Coordinator server', () => {
             );
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
+        });
+        it('should return 400 FILL_REQUESTS_EXCEEDED_RESERVED_TAKER_ASSET_AMOUNT if request to fill an order that is currently fully reserved', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount; // Full amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const dataOne = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransactionOne = createSignedTransaction(dataOne, takerAddress);
+            let body = {
+                signedTransaction: signedTransactionOne,
+                txOrigin: takerAddress,
+            };
+            let response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            const dataTwo = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransactionTwo = createSignedTransaction(dataTwo, takerAddressTwo);
+            body = {
+                signedTransaction: signedTransactionTwo,
+                txOrigin: takerAddressTwo,
+            };
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.FillRequestsExceededReservedTakerAssetAmount,
+            );
+            const orderHash = orderHashUtils.getOrderHashHex(order);
+            expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
+        });
+        it('should return 400 FILL_REQUESTS_EXCEEDED_RESERVED_TAKER_ASSET_AMOUNT if request to fill an order that is partially reserved and the requested amount exceeds this', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmountOne = order.takerAssetAmount.div(2).integerValue(BigNumber.ROUND_FLOOR); // Half amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const dataOne = transactionEncoder.fillOrderTx(order, takerAssetFillAmountOne);
+            const signedTransactionOne = createSignedTransaction(dataOne, takerAddress);
+            let body = {
+                signedTransaction: signedTransactionOne,
+                txOrigin: takerAddress,
+            };
+            let response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            const takerAssetFillAmountTwo = order.takerAssetAmount.times(0.75).integerValue(BigNumber.ROUND_FLOOR); // 3/4 amount
+            const dataTwo = transactionEncoder.fillOrderTx(order, takerAssetFillAmountTwo);
+            const signedTransactionTwo = createSignedTransaction(dataTwo, takerAddressTwo);
+            body = {
+                signedTransaction: signedTransactionTwo,
+                txOrigin: takerAddressTwo,
+            };
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.FillRequestsExceededReservedTakerAssetAmount,
+            );
+            const orderHash = orderHashUtils.getOrderHashHex(order);
+            expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
+        });
+        it('should return 200 OK if request to fill an order that was previously fully reserved and has since expired', async function() {
+            // Required for mocha
+            this.timeout((configs.EXPIRATION_DURATION_SECONDS * 1000) + 6000);
+
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmountOne = order.takerAssetAmount.div(2).integerValue(BigNumber.ROUND_FLOOR); // Half amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const dataOne = transactionEncoder.fillOrderTx(order, takerAssetFillAmountOne);
+            const signedTransactionOne = createSignedTransaction(dataOne, takerAddress);
+            let body = {
+                signedTransaction: signedTransactionOne,
+                txOrigin: takerAddress,
+            };
+            let response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            const takerAssetFillAmountTwo = order.takerAssetAmount.minus(takerAssetFillAmountOne); // Remaining amount
+            const dataTwo = transactionEncoder.fillOrderTx(order, takerAssetFillAmountTwo);
+            const signedTransactionTwo = createSignedTransaction(dataTwo, takerAddressTwo);
+            body = {
+                signedTransaction: signedTransactionTwo,
+                txOrigin: takerAddress,
+            };
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            let secondCurrTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(secondCurrTimestamp);
+
+            // Wait for the existing fill requests to expire
+            await new Promise((resolve) => setTimeout(resolve, (configs.EXPIRATION_DURATION_SECONDS * 1000) + 1000));
+
+            const takerAssetFillAmountThree = order.takerAssetAmount; // Full amount
+            const dataThree = transactionEncoder.fillOrderTx(order, takerAssetFillAmountThree);
+            const signedTransactionThree = createSignedTransaction(dataThree, takerAddressThree);
+            body = {
+                signedTransaction: signedTransactionThree,
+                txOrigin: takerAddressThree,
+            };
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const thirdCurrTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(thirdCurrTimestamp);
         });
     });
     describe('With selective delay', () => {
