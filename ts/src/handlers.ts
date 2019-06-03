@@ -11,8 +11,8 @@ import * as _ from 'lodash';
 
 import { ValidationError, ValidationErrorCodes, ValidationErrorItem } from './errors';
 import { orderModel } from './models/order_model';
-import { transactionModel } from './models/transaction_model';
 import { takerAssetFillAmountModel } from './models/taker_asset_fill_amount_model';
+import { transactionModel } from './models/transaction_model';
 import * as requestTransactionSchema from './schemas/request_transaction_schema.json';
 import * as softCancelsSchema from './schemas/soft_cancels_schema.json';
 import {
@@ -168,7 +168,7 @@ export class Handlers {
 
         // If the server is using reserved fill slots then the total amount unavailable will be the sum of these.
         let reservedOrderHashToFillAmount: OrderHashToFillAmount = {};
-        if (checkReservedFillSlots === true) {
+        if (checkReservedFillSlots) {
             reservedOrderHashToFillAmount = await takerAssetFillAmountModel.getOrderHashToFillAmountReservedAsync(
                 availableCoordinatorOrders,
             );
@@ -379,10 +379,10 @@ export class Handlers {
     }
     public async postSoftCancelsAsync(req: express.Request, res: express.Response): Promise<void> {
         utils.validateSchema(req.body, softCancelsSchema);
-        
+
         const softCancelsFound = await orderModel.findSoftCancelledOrdersByHashAsync(req.body.orderHashes);
         res.status(HttpStatus.OK).send({
-            orderHashes: softCancelsFound
+            orderHashes: softCancelsFound,
         });
     }
     private async _getTakerAssetFillAmountsFromDecodedCalldataAsync(
@@ -544,10 +544,10 @@ export class Handlers {
         networkId: number,
     ): Promise<Response> {
         await Handlers._validateFillsAllowedOrThrowAsync(
-            signedTransaction, 
-            coordinatorOrders, 
-            takerAssetFillAmounts, 
-            this._configs.RESERVED_FILL_SLOTS
+            signedTransaction,
+            coordinatorOrders,
+            takerAssetFillAmounts,
+            this._configs.RESERVED_FILL_SLOTS,
         );
 
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
@@ -566,7 +566,7 @@ export class Handlers {
                 signedTransaction,
                 coordinatorOrders,
                 takerAssetFillAmounts,
-                this._configs.RESERVED_FILL_SLOTS
+                this._configs.RESERVED_FILL_SLOTS,
             );
         }
 

@@ -50,7 +50,7 @@ export async function getAppAsync(
         response.send({
             expirationDurationSeconds: configs.EXPIRATION_DURATION_SECONDS,
             selectiveDelayMs: configs.SELECTIVE_DELAY_MS,
-            supportedNetworkIds: supportedNetworkIds,
+            supportedNetworkIds,
             reservedFillSlots: configs.RESERVED_FILL_SLOTS,
         }).end();
     });

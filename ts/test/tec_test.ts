@@ -865,10 +865,7 @@ describe('Coordinator server', () => {
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
-        it('should return 200 OK if request to fill an order that was previously fully reserved and has since expired', async function() {
-            // Required for mocha
-            this.timeout((configs.EXPIRATION_DURATION_SECONDS * 1000) + 6000);
-
+        it('should return 200 OK if request to fill an order that was previously fully reserved and has since expired', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmountOne = order.takerAssetAmount.div(2).integerValue(BigNumber.ROUND_FLOOR); // Half amount
             const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
@@ -900,11 +897,11 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.signatures).to.not.be.undefined();
             expect(response.body.signatures.length).to.be.equal(1);
-            let secondCurrTimestamp = utils.getCurrentTimestampSeconds();
+            const secondCurrTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(secondCurrTimestamp);
 
             // Wait for the existing fill requests to expire
-            await new Promise((resolve) => setTimeout(resolve, (configs.EXPIRATION_DURATION_SECONDS * 1000) + 1000));
+            await new Promise<void>(resolve => setTimeout(resolve, (configs.EXPIRATION_DURATION_SECONDS * 1000) + 1000));
 
             const takerAssetFillAmountThree = order.takerAssetAmount; // Full amount
             const dataThree = transactionEncoder.fillOrderTx(order, takerAssetFillAmountThree);
@@ -921,7 +918,8 @@ describe('Coordinator server', () => {
             expect(response.body.signatures.length).to.be.equal(1);
             const thirdCurrTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(thirdCurrTimestamp);
-        });
+        })
+            .timeout((configs.EXPIRATION_DURATION_SECONDS * 1000) + 6000);
     });
     describe('With selective delay', () => {
         before(async () => {
@@ -1013,8 +1011,8 @@ describe('Coordinator server', () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const requestBody = {
                 orderHashes: [
-                    orderModel.getHash(orderOne)
-                ]
+                    orderModel.getHash(orderOne),
+                ],
             };
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
@@ -1044,13 +1042,13 @@ describe('Coordinator server', () => {
                 orderModel.getHash(orderOne),
                 orderModel.getHash(orderTwo),
                 orderModel.getHash(orderThree),
-                orderModel.getHash(orderFour)
+                orderModel.getHash(orderFour),
             ];
-            
+
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
                 .send({
-                    orderHashes: orderHashes
+                    orderHashes,
                 });
 
             expect(response.status).to.be.equal(HttpStatus.OK);
