@@ -47,11 +47,13 @@ export async function getAppAsync(
      * GET endpoint for requesting current coordination server configuration
      */
     app.get('/v1/configuration', ({}, response: express.Response) => {
-        response.send({
-            expirationDurationSeconds: configs.EXPIRATION_DURATION_SECONDS,
-            selectiveDelayMs: configs.SELECTIVE_DELAY_MS,
-            supportedNetworkIds: supportedNetworkIds
-        }).end();
+        response
+            .send({
+                expirationDurationSeconds: configs.EXPIRATION_DURATION_SECONDS,
+                selectiveDelayMs: configs.SELECTIVE_DELAY_MS,
+                supportedNetworkIds,
+            })
+            .end();
     });
 
     /**

@@ -1,6 +1,12 @@
 import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
-import { eip712Utils, orderCalculationUtils, orderHashUtils, signatureUtils, transactionHashUtils } from '@0x/order-utils';
+import {
+    eip712Utils,
+    orderCalculationUtils,
+    orderHashUtils,
+    signatureUtils,
+    transactionHashUtils,
+} from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
@@ -350,12 +356,13 @@ export class Handlers {
                 throw utils.getInvalidFunctionCallError(decodedCalldata.functionName);
         }
     }
+    // tslint:disable-next-line:prefer-function-over-method
     public async postSoftCancelsAsync(req: express.Request, res: express.Response): Promise<void> {
         utils.validateSchema(req.body, softCancelsSchema);
-        
+
         const softCancelsFound = await orderModel.findSoftCancelledOrdersByHashAsync(req.body.orderHashes);
         res.status(HttpStatus.OK).send({
-            orderHashes: softCancelsFound
+            orderHashes: softCancelsFound,
         });
     }
     private async _getTakerAssetFillAmountsFromDecodedCalldataAsync(
@@ -445,7 +452,10 @@ export class Handlers {
                     const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(
                         takerAssetFillAmount,
                     );
-                    totalMakerAssetAmount = orderCalculationUtils.getMakerFillAmount(signedOrder, remainingTotalTakerAssetAmount);
+                    totalMakerAssetAmount = orderCalculationUtils.getMakerFillAmount(
+                        signedOrder,
+                        remainingTotalTakerAssetAmount,
+                    );
                     takerAssetFillAmounts.push(takerAssetFillAmount);
                 });
                 break;
