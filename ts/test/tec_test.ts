@@ -1,11 +1,16 @@
 import { CoordinatorContract } from '@0x/abi-gen-wrappers';
 import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
-import { Coordinator as CoordinatorArtifact } from '@0x/contract-artifacts';
 import { ContractWrappers } from '@0x/contract-wrappers';
-import { artifacts as tokensArtifacts, DummyERC20TokenContract } from '@0x/contracts-erc20';
+import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
-import { assetDataUtils, orderCalculationUtils, orderHashUtils, SignatureType, transactionHashUtils } from '@0x/order-utils';
+import {
+    assetDataUtils,
+    orderCalculationUtils,
+    orderHashUtils,
+    SignatureType,
+    transactionHashUtils,
+} from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import { BigNumber, fetchAsync } from '@0x/utils';
@@ -117,16 +122,8 @@ describe('Coordinator server', () => {
             networkId: NETWORK_ID,
         });
 
-        makerTokenContract = new DummyERC20TokenContract(
-            tokensArtifacts.DummyERC20Token.compilerOutput.abi,
-            DEFAULT_MAKER_TOKEN_ADDRESS,
-            provider,
-        );
-        takerTokenContract = new DummyERC20TokenContract(
-            tokensArtifacts.DummyERC20Token.compilerOutput.abi,
-            DEFAULT_TAKER_TOKEN_ADDRESS,
-            provider,
-        );
+        makerTokenContract = new DummyERC20TokenContract(DEFAULT_MAKER_TOKEN_ADDRESS, provider);
+        takerTokenContract = new DummyERC20TokenContract(DEFAULT_TAKER_TOKEN_ADDRESS, provider);
     });
     after(async () => {
         await blockchainLifecycle.revertAsync();
@@ -601,11 +598,7 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmount);
 
-            const coordinatorContract = new CoordinatorContract(
-                CoordinatorArtifact.compilerOutput.abi,
-                contractAddresses.coordinator,
-                provider,
-            );
+            const coordinatorContract = new CoordinatorContract(contractAddresses.coordinator, provider);
 
             await web3Wrapper.awaitTransactionSuccessAsync(
                 await coordinatorContract.executeTransaction.sendTransactionAsync(
@@ -866,8 +859,7 @@ describe('Coordinator server', () => {
             );
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
-            const invalidBody = {
-            };
+            const invalidBody = {};
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
                 .send(invalidBody);
@@ -879,9 +871,7 @@ describe('Coordinator server', () => {
         it('should return 200 OK & empty array if no soft cancelled order hashes could be found', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const requestBody = {
-                orderHashes: [
-                    orderModel.getHash(orderOne)
-                ]
+                orderHashes: [orderModel.getHash(orderOne)],
             };
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
@@ -911,13 +901,13 @@ describe('Coordinator server', () => {
                 orderModel.getHash(orderOne),
                 orderModel.getHash(orderTwo),
                 orderModel.getHash(orderThree),
-                orderModel.getHash(orderFour)
+                orderModel.getHash(orderFour),
             ];
-            
+
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
                 .send({
-                    orderHashes: orderHashes
+                    orderHashes,
                 });
 
             expect(response.status).to.be.equal(HttpStatus.OK);
