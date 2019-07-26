@@ -20,6 +20,6 @@ export const configs = {
         process.env.SELECTIVE_DELAY_MS === undefined ? 1000 : _.parseInt(process.env.SELECTIVE_DELAY_MS),
     EXPIRATION_DURATION_SECONDS:
         process.env.EXPIRATION_DURATION_SECONDS === undefined
-            ? 60
+            ? 90
             : _.parseInt(process.env.EXPIRATION_DURATION_SECONDS), // 1 minute
 };
