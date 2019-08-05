@@ -210,8 +210,12 @@ export class Handlers {
         this._networkIdToContractWrappers = {};
         _.each(networkIdToProvider, (provider: Web3ProviderEngine, networkIdStr: string) => {
             const networkId = _.parseInt(networkIdStr);
+            const contractAddresses = configs.NETWORK_ID_TO_CONTRACT_ADDRESSES
+                ? configs.NETWORK_ID_TO_CONTRACT_ADDRESSES[networkId]
+                : undefined;
             const contractWrappers = new ContractWrappers(provider, {
                 networkId,
+                contractAddresses,
             });
             this._networkIdToContractWrappers[networkId] = contractWrappers;
         });
@@ -580,10 +584,10 @@ export class Handlers {
         networkId: number,
         approvalExpirationTimeSeconds: number,
     ): Promise<RequestTransactionResponse> {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
+        const contractWrappers = this._networkIdToContractWrappers[networkId];
         const typedData = eip712Utils.createCoordinatorApprovalTypedData(
             signedTransaction,
-            contractAddresses.coordinator,
+            contractWrappers.coordinator.address,
             txOrigin,
             new BigNumber(approvalExpirationTimeSeconds),
         );
