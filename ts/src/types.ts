@@ -1,4 +1,4 @@
-import { ContractWrappers } from '@0x/contract-wrappers';
+import { ContractAddresses, ContractWrappers } from '@0x/contract-wrappers';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, ZeroExTransaction } from '@0x/types';
 import { BigNumber } from '@0x/utils';
@@ -7,6 +7,7 @@ import * as WebSocket from 'websocket';
 export interface Configs {
     HTTP_PORT: number;
     NETWORK_ID_TO_SETTINGS: NetworkIdToNetworkSpecificSettings;
+    NETWORK_ID_TO_CONTRACT_ADDRESSES?: NetworkIdToContractAddresses;
     SELECTIVE_DELAY_MS: number;
     EXPIRATION_DURATION_SECONDS: number;
 }
@@ -86,6 +87,9 @@ export interface NetworkSpecificSettings {
     RPC_URL: string;
 }
 
+export interface NetworkIdToContractAddresses {
+    [networkId: number]: ContractAddresses;
+}
 export interface NetworkIdToNetworkSpecificSettings {
     [networkId: number]: NetworkSpecificSettings;
 }
