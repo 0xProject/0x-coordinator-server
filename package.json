@@ -13,6 +13,8 @@
         "start": "node ts/lib/src/server.js",
         "lint": "tslint --project ts --format stylish --exclude ts/src/schemas/**/*",
         "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 6000 --exit",
+        "clean": "shx rm -rf ts/lib",
+        "uninstall": "shx rm -rf node_modules",
         "update_snapshot": "cross-env download --extract --strip 1 --out 0x_ganache_snapshot ${npm_package_config_snapshot_url}",
         "reset_snapshot": "shx rm -rf 0x_ganache_snapshot; yarn update_snapshot"
     },
