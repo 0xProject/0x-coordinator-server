@@ -4,6 +4,7 @@ import { ContractWrappers } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
+import { runMigrationsOnceAsync } from '@0x/migrations';
 import {
     assetDataUtils,
     orderCalculationUtils,
@@ -90,7 +91,6 @@ describe('Coordinator server', () => {
     before(async () => {
         provider = web3Factory.getRpcProvider({
             shouldUseInProcessGanache: true,
-            ganacheDatabasePath: './0x_ganache_snapshot',
         });
 
         web3Wrapper = new Web3Wrapper(provider);
@@ -99,6 +99,7 @@ describe('Coordinator server', () => {
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
         [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
+        await runMigrationsOnceAsync(provider, { from: owner });
 
         contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
         const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
@@ -673,7 +674,7 @@ describe('Coordinator server', () => {
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
         });
-        it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
+        it.only('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
