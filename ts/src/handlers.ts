@@ -148,6 +148,7 @@ export class Handlers {
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
+        txOrigin?: string,
     ): Promise<void> {
         // Find all soft-cancelled orders
         const softCancelledOrderHashes = await orderModel.findSoftCancelledOrdersAsync(coordinatorOrders);
@@ -167,6 +168,7 @@ export class Handlers {
         const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
             availableCoordinatorOrders,
             takerAddress,
+            txOrigin,
         );
         const orderHashesWithInsufficientFillAmounts = [];
         for (let i = 0; i < availableCoordinatorOrders.length; i++) {
@@ -202,6 +204,10 @@ export class Handlers {
         if (validationErrors.length > 0) {
             throw new ValidationError(validationErrors);
         }
+    }
+    private static _isWhitelistedTakerContract(address: string): boolean {
+        const whitelist = JSON.parse(process.env.TAKER_WHITELIST || '[]');
+        return whitelist.includes(address);
     }
     constructor(networkIdToProvider: NetworkIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
         this._networkIdToProvider = networkIdToProvider;
@@ -530,7 +536,12 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<Response> {
-        await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
+        await Handlers._validateFillsAllowedOrThrowAsync(
+            signedTransaction,
+            coordinatorOrders,
+            takerAssetFillAmounts,
+            Handlers._isWhitelistedTakerContract(txOrigin) ? txOrigin : undefined,
+        );
 
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const fillRequestReceivedEvent = {
@@ -548,6 +559,7 @@ export class Handlers {
                 signedTransaction,
                 coordinatorOrders,
                 takerAssetFillAmounts,
+                Handlers._isWhitelistedTakerContract(txOrigin) ? txOrigin : undefined,
             );
         }
 

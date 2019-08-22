@@ -33,6 +33,7 @@ export const transactionModel = {
         opts?: {
             takerAddress?: string;
             isExpired?: boolean;
+            txOrigin?: string;
         },
     ): Promise<TransactionEntity[]> {
         const connection = getDBConnection();
@@ -44,7 +45,13 @@ export const transactionModel = {
             .leftJoinAndSelect('transaction.takerAssetFillAmounts', 'takerAssetFillAmount')
             .where('order.hash IN (:...orderHashes)', { orderHashes });
         if (opts !== undefined && opts.takerAddress !== undefined) {
-            query = query.andWhere('transaction.takerAddress = :takerAddress', { takerAddress: opts.takerAddress });
+            let queryString = 'transaction.takerAddress = :takerAddress';
+            let querySubstitutions: { takerAddress: string; txOrigin?: string } = { takerAddress: opts.takerAddress };
+            if (opts.txOrigin !== undefined) {
+                queryString += ' OR transaction.txOrigin = :txOrigin';
+                querySubstitutions = { ...querySubstitutions, txOrigin: opts.txOrigin };
+            }
+            query = query.andWhere(queryString, querySubstitutions);
         }
         if (opts !== undefined && !opts.isExpired) {
             const currentExpiration = utils.getCurrentTimestampSeconds();
@@ -103,9 +110,10 @@ export const transactionModel = {
     async getOrderHashToFillAmountRequestedAsync(
         orders: Order[],
         takerAddress: string,
+        txOrigin?: string,
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
-        const transactions = await transactionModel.findByOrdersAsync(orders, { takerAddress });
+        const transactions = await transactionModel.findByOrdersAsync(orders, { takerAddress, txOrigin });
         const orderHashToFillAmount: OrderHashToFillAmount = {};
         for (const transaction of transactions) {
             const relevantOrders = _.filter(transaction.orders, o => _.includes(orderHashes, o.hash));
