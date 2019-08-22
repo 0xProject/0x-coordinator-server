@@ -22,6 +22,7 @@
         "@0x/contract-artifacts": "^2.2.0",
         "@0x/contracts-test-utils": "^3.1.14",
         "@0x/dev-utils": "^2.3.1",
+        "@0x/migrations": "^4.3.0",
         "@0x/tslint-config": "^3.0.0",
         "@types/cors": "^2.8.4",
         "@types/dotenv": "^6.1.0",
