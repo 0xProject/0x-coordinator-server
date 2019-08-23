@@ -148,6 +148,7 @@ export class Handlers {
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
+        txOrigin: string,
     ): Promise<void> {
         // Find all soft-cancelled orders
         const softCancelledOrderHashes = await orderModel.findSoftCancelledOrdersAsync(coordinatorOrders);
@@ -167,6 +168,7 @@ export class Handlers {
         const orderHashToFillAmount = await transactionModel.getOrderHashToFillAmountRequestedAsync(
             availableCoordinatorOrders,
             takerAddress,
+            txOrigin,
         );
         const orderHashesWithInsufficientFillAmounts = [];
         for (let i = 0; i < availableCoordinatorOrders.length; i++) {
@@ -530,7 +532,12 @@ export class Handlers {
         takerAssetFillAmounts: BigNumber[],
         networkId: number,
     ): Promise<Response> {
-        await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
+        await Handlers._validateFillsAllowedOrThrowAsync(
+            signedTransaction,
+            coordinatorOrders,
+            takerAssetFillAmounts,
+            txOrigin,
+        );
 
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const fillRequestReceivedEvent = {
@@ -548,6 +555,7 @@ export class Handlers {
                 signedTransaction,
                 coordinatorOrders,
                 takerAssetFillAmounts,
+                txOrigin,
             );
         }
 
