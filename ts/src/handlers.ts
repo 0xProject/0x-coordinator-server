@@ -148,7 +148,7 @@ export class Handlers {
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
         takerAssetFillAmounts: BigNumber[],
-        txOrigin?: string,
+        txOrigin: string,
     ): Promise<void> {
         // Find all soft-cancelled orders
         const softCancelledOrderHashes = await orderModel.findSoftCancelledOrdersAsync(coordinatorOrders);
@@ -204,10 +204,6 @@ export class Handlers {
         if (validationErrors.length > 0) {
             throw new ValidationError(validationErrors);
         }
-    }
-    private static _isWhitelistedTakerContract(address: string): boolean {
-        const whitelist = JSON.parse(process.env.TAKER_WHITELIST || '[]');
-        return whitelist.includes(address);
     }
     constructor(networkIdToProvider: NetworkIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
         this._networkIdToProvider = networkIdToProvider;
@@ -540,7 +536,7 @@ export class Handlers {
             signedTransaction,
             coordinatorOrders,
             takerAssetFillAmounts,
-            Handlers._isWhitelistedTakerContract(txOrigin) ? txOrigin : undefined,
+            txOrigin,
         );
 
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
@@ -559,7 +555,7 @@ export class Handlers {
                 signedTransaction,
                 coordinatorOrders,
                 takerAssetFillAmounts,
-                Handlers._isWhitelistedTakerContract(txOrigin) ? txOrigin : undefined,
+                txOrigin,
             );
         }
 

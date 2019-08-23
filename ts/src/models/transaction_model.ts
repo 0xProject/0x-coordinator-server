@@ -12,6 +12,11 @@ import { utils } from '../utils';
 
 import { orderModel } from './order_model';
 
+function isWhitelistedTakerContract(address: string): boolean {
+    const whitelist = JSON.parse(process.env.TAKER_WHITELIST || '[]');
+    return whitelist.includes(address);
+}
+
 export const transactionModel = {
     async findByHashAsync(transactionHash: string): Promise<TransactionEntity | undefined> {
         const connection = getDBConnection();
@@ -45,13 +50,18 @@ export const transactionModel = {
             .leftJoinAndSelect('transaction.takerAssetFillAmounts', 'takerAssetFillAmount')
             .where('order.hash IN (:...orderHashes)', { orderHashes });
         if (opts !== undefined && opts.takerAddress !== undefined) {
-            let queryString = 'transaction.takerAddress = :takerAddress';
-            let querySubstitutions: { takerAddress: string; txOrigin?: string } = { takerAddress: opts.takerAddress };
-            if (opts.txOrigin !== undefined) {
-                queryString += ' OR transaction.txOrigin = :txOrigin';
-                querySubstitutions = { ...querySubstitutions, txOrigin: opts.txOrigin };
+            if (isWhitelistedTakerContract(opts.takerAddress)) {
+                if (opts.txOrigin === undefined) {
+                    throw new Error(`takerAddress ${opts.takerAddress} is whitelisted but no txOrigin was given`);
+                }
+                query = query.andWhere('transaction.txOrigin = :txOrigin', { txOrigin: opts.txOrigin });
+            } else {
+                query = query.andWhere('transaction.takerAddress = :takerAddress', {
+                    takerAddress: opts.takerAddress,
+                });
             }
-            query = query.andWhere(queryString, querySubstitutions);
+        } else if (opts !== undefined && opts.txOrigin !== undefined) {
+            query = query.andWhere('transaction.txOrigin = :txOrigin', { txOrigin: opts.txOrigin });
         }
         if (opts !== undefined && !opts.isExpired) {
             const currentExpiration = utils.getCurrentTimestampSeconds();
@@ -110,7 +120,7 @@ export const transactionModel = {
     async getOrderHashToFillAmountRequestedAsync(
         orders: Order[],
         takerAddress: string,
-        txOrigin?: string,
+        txOrigin: string,
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
         const transactions = await transactionModel.findByOrdersAsync(orders, { takerAddress, txOrigin });
