@@ -401,10 +401,17 @@ export class Handlers {
                     takerAddresses.push(takerAddress);
                 });
                 const contractWrappers = this._networkIdToContractWrappers[networkId];
-                const orderAndTraderInfos = await contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
+                const [
+                    orderInfos,
+                    traderInfos,
+                ] = await contractWrappers.orderValidator.getOrdersAndTradersInfo.callAsync(
                     signedOrders,
                     takerAddresses,
                 );
+                const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
+                    orderInfo,
+                    traderInfo: traderInfos[index],
+                }));
                 let totalTakerAssetAmount: BigNumber = decodedCalldata.functionArguments.takerAssetFillAmount;
                 _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
                     const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
@@ -432,10 +439,17 @@ export class Handlers {
                     takerAddresses.push(takerAddress);
                 });
                 const contractWrappers = this._networkIdToContractWrappers[networkId];
-                const orderAndTraderInfos = await contractWrappers.orderValidator.getOrdersAndTradersInfoAsync(
+                const [
+                    orderInfos,
+                    traderInfos,
+                ] = await contractWrappers.orderValidator.getOrdersAndTradersInfo.callAsync(
                     signedOrders,
                     takerAddresses,
                 );
+                const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
+                    orderInfo,
+                    traderInfo: traderInfos[index],
+                }));
                 let totalMakerAssetAmount: BigNumber = decodedCalldata.functionArguments.makerAssetFillAmount;
                 _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
                     const signedOrder = signedOrders[i];
