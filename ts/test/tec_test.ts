@@ -674,7 +674,7 @@ describe('Coordinator server', () => {
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
         });
-        it.only('should return 200 OK if request to marketBuy uncancelled orders', async () => {
+        it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
