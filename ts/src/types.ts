@@ -10,6 +10,7 @@ export interface Configs {
     NETWORK_ID_TO_CONTRACT_ADDRESSES?: NetworkIdToContractAddresses;
     SELECTIVE_DELAY_MS: number;
     EXPIRATION_DURATION_SECONDS: number;
+    TAKER_CONTRACT_WHITELIST: string[];
 }
 
 export interface RequestTransactionResponse {

@@ -23,4 +23,5 @@ export const configs = {
     // Optional selective delay on fill requests
     SELECTIVE_DELAY_MS: 0,
     EXPIRATION_DURATION_SECONDS: 90, // 1 minute
+    TAKER_CONTRACT_WHITELIST: [],
 };

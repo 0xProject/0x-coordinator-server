@@ -12,11 +12,6 @@ import { utils } from '../utils';
 
 import { orderModel } from './order_model';
 
-function isWhitelistedTakerContract(address: string): boolean {
-    const whitelist = JSON.parse(process.env.TAKER_WHITELIST || '[]');
-    return whitelist.includes(address);
-}
-
 export const transactionModel = {
     async findByHashAsync(transactionHash: string): Promise<TransactionEntity | undefined> {
         const connection = getDBConnection();
@@ -39,6 +34,7 @@ export const transactionModel = {
             takerAddress?: string;
             isExpired?: boolean;
             txOrigin?: string;
+            takerContractWhitelist?: string[];
         },
     ): Promise<TransactionEntity[]> {
         const connection = getDBConnection();
@@ -50,7 +46,10 @@ export const transactionModel = {
             .leftJoinAndSelect('transaction.takerAssetFillAmounts', 'takerAssetFillAmount')
             .where('order.hash IN (:...orderHashes)', { orderHashes });
         if (opts !== undefined && opts.takerAddress !== undefined) {
-            if (isWhitelistedTakerContract(opts.takerAddress)) {
+            if (
+                opts.takerContractWhitelist !== undefined &&
+                opts.takerContractWhitelist.includes(opts.takerAddress.toLowerCase())
+            ) {
                 if (opts.txOrigin === undefined) {
                     throw new Error(`takerAddress ${opts.takerAddress} is whitelisted but no txOrigin was given`);
                 }
@@ -121,9 +120,14 @@ export const transactionModel = {
         orders: Order[],
         takerAddress: string,
         txOrigin: string,
+        takerContractWhitelist?: string[],
     ): Promise<OrderHashToFillAmount> {
         const orderHashes = _.map(orders, o => orderModel.getHash(o));
-        const transactions = await transactionModel.findByOrdersAsync(orders, { takerAddress, txOrigin });
+        const transactions = await transactionModel.findByOrdersAsync(orders, {
+            takerAddress,
+            txOrigin,
+            takerContractWhitelist,
+        });
         const orderHashToFillAmount: OrderHashToFillAmount = {};
         for (const transaction of transactions) {
             const relevantOrders = _.filter(transaction.orders, o => _.includes(orderHashes, o.hash));

@@ -1,6 +1,8 @@
 import * as _ from 'lodash';
 
-export const configs = {
+import { Configs } from './types';
+
+export const configs: Configs = {
     // Network port to listen on
     HTTP_PORT: process.env.COORDINATOR_HTTP_PORT === undefined ? 3000 : _.parseInt(process.env.COORDINATOR_HTTP_PORT),
     // Ethereum RPC url
@@ -22,4 +24,7 @@ export const configs = {
         process.env.EXPIRATION_DURATION_SECONDS === undefined
             ? 90
             : _.parseInt(process.env.EXPIRATION_DURATION_SECONDS), // 1 minute
+    TAKER_CONTRACT_WHITELIST: JSON.parse(process.env.TAKER_CONTRACT_WHITELIST || '[]').map(
+        (address: string): string => address.toLowerCase(),
+    ),
 };
