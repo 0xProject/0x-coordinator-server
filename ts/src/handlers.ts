@@ -9,7 +9,7 @@ import {
 } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
-import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
+import { BigNumber, DecodedCalldata, logUtils, signTypedDataUtils } from '@0x/utils';
 import * as ethUtil from 'ethereumjs-util';
 import * as express from 'express';
 import * as HttpStatus from 'http-status-codes';
@@ -216,13 +216,19 @@ export class Handlers {
         const transactionHash = transactionHashUtils.getTransactionHashHex(signedTransaction);
         const transactionIfExists = await transactionModel.findByHashAsync(transactionHash);
         if (transactionIfExists !== undefined) {
-            throw new ValidationError([
-                {
-                    field: 'signedTransaction',
-                    code: ValidationErrorCodes.TransactionAlreadyUsed,
-                    reason: `A transaction can only be approved once. To request approval to perform the same actions, generate and sign an identical transaction with a different salt value.`,
-                },
-            ]);
+            if (
+                !this._configs.TAKER_CONTRACT_WHITELIST.includes(signedTransaction.signerAddress) ||
+                txOrigin === transactionIfExists.txOrigin
+            ) {
+                logUtils.log('throwing ValidationError');
+                throw new ValidationError([
+                    {
+                        field: 'signedTransaction',
+                        code: ValidationErrorCodes.TransactionAlreadyUsed,
+                        reason: `A transaction can only be approved once. To request approval to perform the same actions, generate and sign an identical transaction with a different salt value.`,
+                    },
+                ]);
+            }
         }
 
         // 5. Validate the 0x transaction signature

@@ -68,6 +68,8 @@ let owner: string;
 let makerAddress: string;
 let takerAddress: string;
 let feeRecipientAddress: string;
+let takerContractAddress: string;
+let anotherAddress: string;
 let makerTokenContract: DummyERC20TokenContract;
 let takerTokenContract: DummyERC20TokenContract;
 let transactionFactory: TransactionFactory;
@@ -105,7 +107,11 @@ describe('Coordinator server', () => {
 
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
-        [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
+        [owner, makerAddress, takerAddress, feeRecipientAddress, takerContractAddress, anotherAddress] = _.slice(
+            accounts,
+            0,
+            6,
+        );
 
         contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
         const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
@@ -754,6 +760,75 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.TransactionAlreadyUsed);
+        });
+        it('should return 400 TRANSACTION_ALREADY_USED if request same 0x transaction multiple times, even if the signedTransaction.signerAddress is whitelisted', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount; // Full amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransaction = createSignedTransaction(data, takerContractAddress);
+            const body = {
+                signedTransaction,
+                txOrigin: takerAddress,
+            };
+            let response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.TransactionAlreadyUsed);
+        });
+        it('should respond 200 OK to a request for a previously-approved 0x transaction when txOrigin varies from the previous approval and when signedTransaction.signerAddress is whitelisted', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount; // Full amount
+            const transactionEncoder = await contractWrappers.exchange.transactionEncoderAsync();
+            const data = transactionEncoder.fillOrderTx(order, takerAssetFillAmount);
+            const signedTransaction = createSignedTransaction(data, takerContractAddress);
+            const body = {
+                signedTransaction,
+                txOrigin: takerAddress,
+            };
+            let response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            body.txOrigin = anotherAddress;
+            response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(utils.getCurrentTimestampSeconds());
+        });
+        it('should return 200 OK, and use txOrigin to find an order to fill, when signedTransaction.signerAddress is blank', async () => {
+            return;
+        });
+        it('should return 400 NO_TX_ORIGIN when signedTransaction.signerAddress is defined and whitelisted but txOrigin is unspecified', async () => {
+            return;
+        });
+        it('should return 200 OK, and find a fillable order by txOrigin, when signedTransaction.signerAddress is defined, and whitelisted, and when txOrigin is also defined', async () => {
+            return;
+        });
+        it("should return 200 OK, and find a fillable order by signedTransaction.signerAddress, when that signerAddress is defined. and when it's NOT whitelisted.", async () => {
+            return;
+        });
+        it('should return 200 OK, and find a fillable order by txOrigin, when signedTransaction.signerAddress is undefined, and txOrigin is also defined', async () => {
+            return;
         });
         it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
             const order = await orderFactory.newSignedOrderAsync();

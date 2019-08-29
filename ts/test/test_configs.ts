@@ -23,5 +23,7 @@ export const configs = {
     // Optional selective delay on fill requests
     SELECTIVE_DELAY_MS: 0,
     EXPIRATION_DURATION_SECONDS: 90, // 1 minute
-    TAKER_CONTRACT_WHITELIST: [],
+    TAKER_CONTRACT_WHITELIST: [
+        '0x78dc5d2d739606d31509c31d654056a45185ecb6', // accounts[4] in ganache snapshot
+    ],
 };
