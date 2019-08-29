@@ -25,10 +25,12 @@ import * as HttpStatus from 'http-status-codes';
 import * as _ from 'lodash';
 import 'mocha';
 import * as request from 'supertest';
+import { ConnectionOptions } from 'typeorm';
 import * as WebSocket from 'websocket';
 
 import { getAppAsync } from '../src/app';
 import { assertConfigsAreValid } from '../src/assertions';
+import { defaultOrmConfig } from '../src/default_ormconfig';
 import { TakerAssetFillAmountEntity } from '../src/entities/taker_asset_fill_amount_entity';
 import { TransactionEntity } from '../src/entities/transaction_entity';
 import { GeneralErrorCodes, ValidationErrorCodes } from '../src/errors';
@@ -48,6 +50,11 @@ chai.use(chaiAsPromised);
 const expect = chai.expect;
 
 assertConfigsAreValid(configs);
+
+const dbConfigs: ConnectionOptions = {
+    ...defaultOrmConfig,
+    logging: ['error', 'schema', 'warn', 'info', 'log'], // intention: disable 'query'. it's too noisy.
+};
 
 const TESTRPC_PRIVATE_KEYS = _.map(TESTRPC_PRIVATE_KEYS_STRINGS, privateKeyString =>
     ethUtil.toBuffer(privateKeyString),
@@ -197,6 +204,7 @@ describe('Coordinator server', () => {
                     [NETWORK_ID]: provider,
                 },
                 configs,
+                dbConfigs,
             );
         });
         it('should return coordinator configuration', async () => {
@@ -216,6 +224,7 @@ describe('Coordinator server', () => {
                     [NETWORK_ID]: provider,
                 },
                 configs,
+                dbConfigs,
             );
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
@@ -794,6 +803,7 @@ describe('Coordinator server', () => {
                     [NETWORK_ID]: provider,
                 },
                 configWithDelay,
+                dbConfigs,
             );
         });
         it('should abort fill request if cancellation received during selective delay', done => {
@@ -856,6 +866,7 @@ describe('Coordinator server', () => {
                     [NETWORK_ID]: provider,
                 },
                 configs,
+                dbConfigs,
             );
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
@@ -926,6 +937,7 @@ describe('Coordinator server', () => {
                     [NETWORK_ID]: provider,
                 },
                 configs,
+                dbConfigs,
             );
             app.listen(TEST_PORT, () => {
                 utils.log(`Coordinator SERVER API (HTTP) listening on port ${TEST_PORT}`);
