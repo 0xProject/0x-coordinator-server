@@ -19,7 +19,7 @@ export class TransactionFactory {
         const gasPrice = new BigNumber(1);
         const signerAddress = `0x${this._signerBuff.toString('hex')}`;
         const domain = {
-            chainId: 50, // @todo update
+            chainId: 1337, // @todo update
             verifyingContract: this._exchangeAddress,
         }
         const transaction = {

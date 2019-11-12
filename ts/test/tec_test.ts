@@ -74,7 +74,7 @@ let contractWrappers: ContractWrappers;
 
 // Websocket tests only
 const TEST_PORT = 8361;
-const NETWORK_ID = 50;
+const NETWORK_ID = 1337;
 const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?networkId=${NETWORK_ID}`;
 let wsClient: WebSocket.w3cwebsocket;
 
