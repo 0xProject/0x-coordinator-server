@@ -621,7 +621,6 @@ export class Handlers {
             signedTransaction,
             contractWrappers.coordinator.address,
             txOrigin,
-            new BigNumber(approvalExpirationTimeSeconds),
         );
         const approvalHashBuff = signTypedDataUtils.generateTypedDataHash(typedData);
 
