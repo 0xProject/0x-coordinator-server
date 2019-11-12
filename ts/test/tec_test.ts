@@ -123,7 +123,7 @@ describe('Coordinator server', () => {
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
 
         contractWrappers = new ContractWrappers(provider, {
-            networkId: NETWORK_ID,
+            chainId: NETWORK_ID,
         });
 
         makerTokenContract = new DummyERC20TokenContract(DEFAULT_MAKER_TOKEN_ADDRESS, provider);
