@@ -2,6 +2,7 @@ import { signingUtils } from '@0x/contracts-test-utils';
 import { generatePseudoRandomSalt, transactionHashUtils } from '@0x/order-utils';
 import { SignatureType, SignedZeroExTransaction } from '@0x/types';
 import * as ethUtil from 'ethereumjs-util';
+import { BigNumber } from '@0x/utils';
 
 export class TransactionFactory {
     private readonly _signerBuff: Buffer;
@@ -14,14 +15,21 @@ export class TransactionFactory {
     }
     public newSignedTransaction(data: string, signatureType: SignatureType): SignedZeroExTransaction {
         const salt = generatePseudoRandomSalt();
+        const expirationTimeSeconds = new BigNumber(9999999999); // @todo Update
+        const gasPrice = new BigNumber(1);
         const signerAddress = `0x${this._signerBuff.toString('hex')}`;
+        const domain = {
+            chainId: 50, // @todo update
+            verifyingContract: this._exchangeAddress,
+        }
         const transaction = {
             salt,
+            expirationTimeSeconds,
+            gasPrice,
             signerAddress,
             data,
-            verifyingContractAddress: this._exchangeAddress,
+            domain
         };
-
         const transactionHashBuffer = transactionHashUtils.getTransactionHashBuffer(transaction);
         const signature = signingUtils.signMessage(transactionHashBuffer, this._privateKey, signatureType);
         const signedTransaction = {
