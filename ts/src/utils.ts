@@ -1,5 +1,5 @@
 import { Schema, SchemaValidator } from '@0x/json-schemas';
-import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
+import { Order, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import * as ethUtil from 'ethereumjs-util';
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
@@ -53,7 +53,7 @@ export const utils = {
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise<void>(resolve => setTimeout(resolve, miliseconds));
     },
-    convertToUnsignedOrder(order: SignedOrder): OrderWithoutExchangeAddress {
+    convertToUnsignedOrder(order: SignedOrder): Order {
         const orderWithoutExchangeAddress = {
             ...order,
         };
@@ -61,7 +61,7 @@ export const utils = {
         return orderWithoutExchangeAddress;
     },
     getSignedOrdersFromOrderWithoutExchangeAddresses(
-        orders: OrderWithoutExchangeAddress[],
+        orders: Order[],
         signatures: string[],
         exchangeAddress: string,
     ): SignedOrder[] {
