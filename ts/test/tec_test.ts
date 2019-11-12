@@ -625,14 +625,14 @@ describe('Coordinator server', () => {
                 testConstants.AWAIT_TRANSACTION_MINED_MS,
             );
         });
-        it('should return 200 OK if request to marketSell uncancelled orders', async () => {
+        it('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
             const orderOneTakerAssetFillAmount = orderOne.takerAssetAmount;
             const orderTwoTakerAssetFillAmount = orderTwo.takerAssetAmount.div(2);
             const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
-            const data = contractWrappers.exchange.marketSellOrders.getABIEncodedTransactionData(
+            const data = contractWrappers.exchange.marketSellOrdersNoThrow.getABIEncodedTransactionData(
                 [orderOne, orderTwo],
                 takerAssetFillAmount,
                 [orderOne.signature, orderTwo.signature],
@@ -684,7 +684,7 @@ describe('Coordinator server', () => {
             const orderOneMakerAssetFillAmount = orderOne.makerAssetAmount;
             const orderTwoMakerAssetFillAmount = orderTwo.makerAssetAmount.div(2);
             const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
-            const data = contractWrappers.exchange.marketBuyOrders.getABIEncodedTransactionData(
+            const data = contractWrappers.exchange.marketBuyOrdersNoThrow.getABIEncodedTransactionData(
                 [orderOne, orderTwo],
                 makerAssetFillAmount,
                 [orderOne.signature, orderTwo.signature],
