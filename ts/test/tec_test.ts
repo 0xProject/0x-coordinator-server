@@ -1,5 +1,5 @@
 import { CoordinatorContract, ERC20TokenContract } from '@0x/abi-gen-wrappers';
-import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
+import { ContractAddresses, getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
@@ -101,7 +101,7 @@ describe('Coordinator server', () => {
         [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
         await runMigrationsOnceAsync(provider, { from: owner });
 
-        contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
+        contractAddresses = getContractAddressesForChainOrThrow(NETWORK_ID);
         const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
         if (feeRecipientAddress !== settings.FEE_RECIPIENTS[0].ADDRESS) {
             throw new Error(`Expected settings.FEE_RECIPEINTS[0].ADDRESS to be ${feeRecipientAddress}`);

@@ -1,5 +1,5 @@
-import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
-import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
+import { getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
+import { ContractWrappers } from '@0x/contract-wrappers';
 import {
     eip712Utils,
     orderCalculationUtils,
@@ -47,6 +47,24 @@ enum ExchangeMethods {
 
     CancelOrder = 'cancelOrder',
     BatchCancelOrders = 'batchCancelOrders',
+}
+
+interface OrderAndTraderInfo { // be67c25b0
+    orderInfo: {
+        orderStatus: number,
+        orderHash: string,
+        orderTakerAssetFilledAmount: BigNumber,
+    },
+    traderInfo: {
+        makerBalance: BigNumber,
+        makerAllowance: BigNumber,
+        takerBalance: BigNumber,
+        takerAllowance: BigNumber,
+        makerZrxBalance: BigNumber,
+        makerZrxAllowance: BigNumber,
+        takerZrxBalance: BigNumber,
+        takerZrxAllowance: BigNumber,
+    }
 }
 
 export class Handlers {
@@ -107,7 +125,7 @@ export class Handlers {
         return maxTakerAssetFillAmount;
     }
     private static _getOrdersFromDecodedCalldata(decodedCalldata: DecodedCalldata, networkId: number): Order[] {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
+        const contractAddresses = getContractAddressesForChainOrThrow(networkId);
 
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
@@ -374,7 +392,7 @@ export class Handlers {
         takerAddress: string,
         networkId: number,
     ): Promise<BigNumber[]> {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
+        const contractAddresses = getContractAddressesForChainOrThrow(networkId);
         let takerAssetFillAmounts: BigNumber[] = [];
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
