@@ -232,7 +232,7 @@ export class Handlers {
                 ? configs.NETWORK_ID_TO_CONTRACT_ADDRESSES[networkId]
                 : undefined;
             const contractWrappers = new ContractWrappers(provider, {
-                networkId,
+                chainId: networkId,
                 contractAddresses,
             });
             this._networkIdToContractWrappers[networkId] = contractWrappers;
