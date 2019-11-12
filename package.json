@@ -20,7 +20,6 @@
     "devDependencies": {
         "@0x/abi-gen-wrappers": "^5.4.0-beta.1",
         "@0x/contract-artifacts": "^2.3.0-beta.2",
-        "@0x/contracts-test-utils": "^3.2.0-beta.1",
         "@0x/dev-utils": "^2.4.0-beta.1",
         "@0x/migrations": "^4.4.0-beta.1",
         "@0x/tslint-config": "^3.1.0-beta.1",
@@ -73,6 +72,9 @@
         "sqlite3": "^4.0.2",
         "typeorm": "0.2.7",
         "websocket": "^1.0.25",
+        "ganache-core": "2.6.0"
+    },
+    "resolutions": {
         "ganache-core": "2.6.0"
     }
 }
