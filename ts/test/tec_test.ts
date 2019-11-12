@@ -89,9 +89,12 @@ const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb
 
 describe('Coordinator server', () => {
     before(async () => {
-        provider = web3Factory.getRpcProvider({
+        const ganacheConfigs = {
+            total_accounts: 10,
             shouldUseInProcessGanache: true,
-        });
+            shouldAllowUnlimitedContractSize: true,
+        };
+        provider = web3Factory.getRpcProvider(ganacheConfigs);
 
         web3Wrapper = new Web3Wrapper(provider);
         blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
