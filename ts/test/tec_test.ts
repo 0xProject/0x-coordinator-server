@@ -228,7 +228,7 @@ describe.only('Coordinator server', () => {
             expect(response.body.supportedNetworkIds[0]).to.be.equal(NETWORK_ID);
         });
     });
-    describe.only('#/v1/request_transaction', () => {
+    describe('#/v1/request_transaction', () => {
         before(async () => {
             app = await getAppAsync(
                 {
@@ -263,7 +263,6 @@ describe.only('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
-            console.log(JSON.stringify(response, null, 4));
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(
@@ -633,7 +632,7 @@ describe.only('Coordinator server', () => {
                 testConstants.AWAIT_TRANSACTION_MINED_MS,
             );
         });
-        it.only('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
+        it('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
@@ -685,7 +684,7 @@ describe.only('Coordinator server', () => {
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
         });
-        it.skip('should return 200 OK if request to marketBuy uncancelled orders', async () => {
+        it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
