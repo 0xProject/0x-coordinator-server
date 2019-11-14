@@ -112,17 +112,26 @@ describe.only('Coordinator server', () => {
             throw new Error(`Expected settings.FEE_RECIPEINTS[0].ADDRESS to be ${feeRecipientAddress}`);
         }
 
+        contractWrappers = new ContractWrappers(provider, {
+            chainId: NETWORK_ID,
+        });
+
         const defaultOrderParams = {
             ...testConstants.STATIC_ORDER_PARAMS,
-            senderAddress: contractAddresses.coordinator,
-            exchangeAddress: contractAddresses.exchange,
             makerAddress,
             feeRecipientAddress,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
+            makerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
+            takerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
+            exchangeAddress: contractAddresses.exchange,
+            chainId: NETWORK_ID,
+            senderAddress: contractAddresses.coordinator,
         };
         const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
+        const testOrder = await orderFactory.newSignedOrderAsync();
+        const fillTestOrderCalldata = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(testOrder, new BigNumber(5), testOrder.signature);
 
         defaultTransactionParams = {
             salt: new BigNumber(
@@ -130,16 +139,12 @@ describe.only('Coordinator server', () => {
             expirationTimeSeconds: new BigNumber(999999999),
             gasPrice: new BigNumber(1),
             signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
-            data: '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c6dfa8c3aeb4634b714b7f4f0b235cf8b77707f0c8d36d1ea8b28b44560c5caa323d855000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b2f1cd06f64e08a71d6cb579a086c356f313ebc2aeeb66a827408aab78439ec7724dfd59fbad7a4c8009f893f724cab90d0f82f45c49f9f76c7e1d7a2c7f2ca4203000000000000000000000000000000000000000000000000000000000000',
-            domain: {
+            data: fillTestOrderCalldata,
+             domain: {
                 chainId: NETWORK_ID,
                 verifyingContract: contractAddresses.coordinator,
             },
         };
-
-        contractWrappers = new ContractWrappers(provider, {
-            chainId: NETWORK_ID,
-        });
 
         makerTokenContract = new DummyERC20TokenContract(DEFAULT_MAKER_TOKEN_ADDRESS, provider);
         takerTokenContract = new DummyERC20TokenContract(DEFAULT_TAKER_TOKEN_ADDRESS, provider);
@@ -254,10 +259,11 @@ describe.only('Coordinator server', () => {
             expect(response.body.validationErrors[0].field).to.be.equal('signerAddress');
         });
         it.only('should return 400 Bad Request if signature is invalid', async () => {
+            const invalidSignature = '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
             const invalidBody = {
                 signedTransaction: {
                     ...defaultTransactionParams,
-                    signature: '0x'
+                    signature: invalidSignature
                 }
             };
             const response = await request(app)

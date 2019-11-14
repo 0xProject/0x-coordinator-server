@@ -256,6 +256,7 @@ export class Handlers {
                 .getAbiDecoder()
                 .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
         } catch (err) {
+            console.log("ERROR:" ,JSON.stringify(err));
             throw new ValidationError([
                 {
                     field: 'signedTransaction.data',
