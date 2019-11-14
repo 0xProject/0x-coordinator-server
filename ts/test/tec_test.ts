@@ -90,7 +90,7 @@ const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb
 let defaultTransactionParams: ZeroExTransaction;
 const dummySignature = '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
 
-describe.only('Coordinator server', () => {
+describe('Coordinator server', () => {
     before(async () => {
         const ganacheConfigs = {
             total_accounts: 10,
