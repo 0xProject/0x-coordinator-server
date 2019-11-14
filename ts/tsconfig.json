@@ -9,10 +9,12 @@
         "resolveJsonModule": true,
         "emitDecoratorMetadata": true,
         "experimentalDecorators": true,
-        "sourceMap": false,
-        "declaration": true,
         "typeRoots": ["../node_modules/@0x/typescript-typings/types", "../node_modules/@types"],
-        "noUnusedParameters": true
+        "noUnusedParameters": true,
+        // These settings are required for TypeScript project references
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true
     },
     "include": ["src", "test"]
 }
