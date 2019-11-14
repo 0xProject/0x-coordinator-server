@@ -49,22 +49,26 @@ enum ExchangeMethods {
     BatchCancelOrders = 'batchCancelOrders',
 }
 
+interface OrderInfo {
+    orderStatus: number,
+    orderHash: string,
+    orderTakerAssetFilledAmount: BigNumber,
+}
+
+interface TraderInfo {
+    makerBalance: BigNumber,
+    makerAllowance: BigNumber,
+    takerBalance: BigNumber,
+    takerAllowance: BigNumber,
+    makerZrxBalance: BigNumber,
+    makerZrxAllowance: BigNumber,
+    takerZrxBalance: BigNumber,
+    takerZrxAllowance: BigNumber,
+}
+
 interface OrderAndTraderInfo { // be67c25b0
-    orderInfo: {
-        orderStatus: number,
-        orderHash: string,
-        orderTakerAssetFilledAmount: BigNumber,
-    },
-    traderInfo: {
-        makerBalance: BigNumber,
-        makerAllowance: BigNumber,
-        takerBalance: BigNumber,
-        takerAllowance: BigNumber,
-        makerZrxBalance: BigNumber,
-        makerZrxAllowance: BigNumber,
-        takerZrxBalance: BigNumber,
-        takerZrxAllowance: BigNumber,
-    }
+    orderInfo: OrderInfo,
+    traderInfo: TraderInfo
 }
 
 export class Handlers {
@@ -416,23 +420,60 @@ export class Handlers {
                     decodedCalldata.functionArguments.signatures,
                     contractAddresses.exchange,
                 );
-                const takerAddresses: string[] = [];
-                _.times(signedOrders.length, () => {
-                    takerAddresses.push(takerAddress);
-                });
                 const contractWrappers = this._networkIdToContractWrappers[networkId];
-                const [
-                    orderInfos,
-                    traderInfos,
-                ] = await contractWrappers.orderValidator.getOrdersAndTradersInfo.callAsync(
-                    signedOrders,
-                    takerAddresses,
-                );
+                const signatures = _.map(signedOrders, 'signature');
+
+                // Collect order and trader info
+                const [orderInfos,,] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(signedOrders, signatures);
+                let traderInfos: TraderInfo[] = [];
+                for (const signedOrder of signedOrders) {
+                    const [
+                        makerBalancesAndAllowances,
+                        takerBalancesAndAllowances,
+                    ]
+                         = await Promise.all([
+                             // Maker balances and allowances
+                            contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(
+                                signedOrder.makerAddress,
+                                [
+                                    signedOrder.makerAssetData,
+                                    signedOrder.makerFeeAssetData
+                                ]
+                            ),
+
+                            // Taker balances and allowances
+                            contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(
+                                takerAddress,
+                                [
+                                    signedOrder.takerAssetData,
+                                    signedOrder.takerFeeAssetData
+                                ]
+                            ),
+                        ]);
+
+                    traderInfos.push(
+                        {
+                            // Maker
+                            makerBalance: makerBalancesAndAllowances[0][0],
+                            makerAllowance: makerBalancesAndAllowances[0][1],
+                            makerZrxBalance: makerBalancesAndAllowances[1][0],
+                            makerZrxAllowance: makerBalancesAndAllowances[1][0],
+
+                            // Taker
+                            takerBalance: takerBalancesAndAllowances[0][0],
+                            takerAllowance: takerBalancesAndAllowances[0][1],
+                            takerZrxBalance: takerBalancesAndAllowances[1][0],
+                            takerZrxAllowance: takerBalancesAndAllowances[1][0],
+                        }
+                    );
+                }
                 const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
                     orderInfo,
                     traderInfo: traderInfos[index],
                 }));
                 let totalTakerAssetAmount: BigNumber = decodedCalldata.functionArguments.takerAssetFillAmount;
+
+                // Compute taker asset fill amounts from order/trader infos
                 _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
                     const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
                         signedOrders[i],

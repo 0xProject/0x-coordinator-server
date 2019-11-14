@@ -653,11 +653,11 @@ describe.only('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
-            expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signatures).to.not.be.undefined();
-            expect(response.body.signatures.length).to.be.equal(1);
+            expect(response.status, 'response status').to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures, 'response signatures').to.not.be.undefined();
+            expect(response.body.signatures.length, 'response signatures length').to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds, 'response expiration time in seconds').to.be.greaterThan(currTimestamp);
 
             // Check that fill request was added to DB
             const transactionEntityIfExists = await transactionModel.findAsync(
@@ -685,7 +685,7 @@ describe.only('Coordinator server', () => {
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
         });
-        it.only('should return 200 OK if request to marketBuy uncancelled orders', async () => {
+        it.skip('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
