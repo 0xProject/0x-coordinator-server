@@ -258,7 +258,7 @@ describe.only('Coordinator server', () => {
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.RequiredField);
             expect(response.body.validationErrors[0].field).to.be.equal('signerAddress');
         });
-        it.only('should return 400 Bad Request if signature is invalid', async () => {
+        it('should return 400 Bad Request if signature is invalid', async () => {
             const invalidSignature = '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
             const invalidBody = {
                 signedTransaction: {
@@ -333,7 +333,7 @@ describe.only('Coordinator server', () => {
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.OnlyMakerCanCancelOrders);
         });
-        it('should return 200 and only cancel Coordinator order if only one order sent in batch cancellation is a Coordinator order', async () => {
+        it.only('should return 200 and only cancel Coordinator order if only one order sent in batch cancellation is a Coordinator order', async () => {
             const coordinatorOrder = await orderFactory.newSignedOrderAsync();
             const notCoordinatorOrder = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,

@@ -136,6 +136,7 @@ export class Handlers {
                 const order = {
                     ...orderWithoutExchangeAddress,
                     exchangeAddress: contractAddresses.exchange,
+                    chainId: networkId,
                 };
                 return [order];
             }
@@ -153,6 +154,7 @@ export class Handlers {
                     return {
                         ...orderWithoutExchangeAddress,
                         exchangeAddress: contractAddresses.exchange,
+                        chainId: networkId,
                     };
                 });
                 return orders;
@@ -256,7 +258,6 @@ export class Handlers {
                 .getAbiDecoder()
                 .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
         } catch (err) {
-            console.log("ERROR:" ,JSON.stringify(err));
             throw new ValidationError([
                 {
                     field: 'signedTransaction.data',
