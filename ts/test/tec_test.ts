@@ -88,6 +88,7 @@ const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3'
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
 
 let defaultTransactionParams: ZeroExTransaction;
+const dummySignature = '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
 
 describe.only('Coordinator server', () => {
     before(async () => {
@@ -227,7 +228,7 @@ describe.only('Coordinator server', () => {
             expect(response.body.supportedNetworkIds[0]).to.be.equal(NETWORK_ID);
         });
     });
-    describe('#/v1/request_transaction', () => {
+    describe.only('#/v1/request_transaction', () => {
         before(async () => {
             app = await getAppAsync(
                 {
@@ -237,19 +238,13 @@ describe.only('Coordinator server', () => {
             );
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
-            const invalidBody = {
+            let invalidBody = {
                 signedTransaction: {
-                    // Missing signerAddress
-                    salt: new BigNumber(
-                        '10798369788836331947878244228295394663118854512666292664573150674534689981547',
-                    ),
-                    data:
-                        '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c5f2b93a6902335d6d05d92895df0a8c381bfc14c342d58df4f926ee938fa1871677f7c000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b1b52aa1994a139883072845a049e4bfda827a5ab435a7f417e37c7bc18663362306d5a9e50f8aa110330987731be51dbfe69a2a0de2c4103da79dbb42b3070b203000000000000000000000000000000000000000000000000000000000000',
-                    verifyingContractAddress: contractAddresses.coordinator,
-                    signature:
-                        '0x1cc0b3a07c8bd0346e8ad34278beb28f5b90720ccfde3fe761333971e2b130abd75546534e8d8f0b476c201c573ffeb0c24ed2753ba70e4fe68820075b5eaf1a0003',
-                },
+                    ...defaultTransactionParams,
+                    signature: dummySignature
+                }
             };
+            delete invalidBody.signedTransaction.signerAddress;
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
@@ -259,11 +254,10 @@ describe.only('Coordinator server', () => {
             expect(response.body.validationErrors[0].field).to.be.equal('signerAddress');
         });
         it('should return 400 Bad Request if signature is invalid', async () => {
-            const invalidSignature = '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
             const invalidBody = {
                 signedTransaction: {
                     ...defaultTransactionParams,
-                    signature: invalidSignature
+                    signature: dummySignature
                 }
             };
             const response = await request(app)
@@ -333,7 +327,7 @@ describe.only('Coordinator server', () => {
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.OnlyMakerCanCancelOrders);
         });
-        it.only('should return 200 and only cancel Coordinator order if only one order sent in batch cancellation is a Coordinator order', async () => {
+        it('should return 200 and only cancel Coordinator order if only one order sent in batch cancellation is a Coordinator order', async () => {
             const coordinatorOrder = await orderFactory.newSignedOrderAsync();
             const notCoordinatorOrder = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
@@ -639,7 +633,7 @@ describe.only('Coordinator server', () => {
                 testConstants.AWAIT_TRANSACTION_MINED_MS,
             );
         });
-        it('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
+        it.only('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
@@ -691,7 +685,7 @@ describe.only('Coordinator server', () => {
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
         });
-        it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
+        it.only('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
@@ -907,10 +901,10 @@ describe.only('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
                 .send(invalidBody);
-            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
-            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.RequiredField);
-            expect(response.body.validationErrors[0].field).to.be.equal('orderHashes');
+            expect(response.status, 'status').to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code, 'code').to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code, 'validation error code').to.be.equal(ValidationErrorCodes.RequiredField);
+            expect(response.body.validationErrors[0].field, 'validation error field').to.be.equal('orderHashes');
         });
         it('should return 200 OK & empty array if no soft cancelled order hashes could be found', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
