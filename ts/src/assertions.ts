@@ -35,9 +35,7 @@ export function assertConfigsAreValid(configs: Configs): void {
             const recoveredAddress = utils.getAddressFromPrivateKey(feeRecipient.PRIVATE_KEY);
             if (recoveredAddress !== feeRecipient.ADDRESS) {
                 throw new Error(
-                    `FeeRecipientAddress ${feeRecipient.ADDRESS} does not correspond to the private key ${
-                        feeRecipient.PRIVATE_KEY
-                    }`,
+                    `FeeRecipientAddress ${feeRecipient.ADDRESS} does not correspond to the private key ${feeRecipient.PRIVATE_KEY}`,
                 );
             }
         });

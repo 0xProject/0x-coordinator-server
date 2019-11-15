@@ -15,6 +15,9 @@ export class TakerAssetFillAmountEntity {
     @Column()
     public orderHash!: string;
 
-    @ManyToOne(_type => TransactionEntity, transaction => transaction.takerAssetFillAmounts)
+    @ManyToOne(
+        _type => TransactionEntity,
+        transaction => transaction.takerAssetFillAmounts,
+    )
     public transaction!: TransactionEntity;
 }

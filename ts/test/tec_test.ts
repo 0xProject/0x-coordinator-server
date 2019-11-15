@@ -88,7 +88,8 @@ const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3'
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
 
 let defaultTransactionParams: ZeroExTransaction;
-const dummySignature = '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
+const dummySignature =
+    '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
 
 describe('Coordinator server', () => {
     before(async () => {
@@ -132,16 +133,19 @@ describe('Coordinator server', () => {
         const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
         const testOrder = await orderFactory.newSignedOrderAsync();
-        const fillTestOrderCalldata = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(testOrder, new BigNumber(5), testOrder.signature);
+        const fillTestOrderCalldata = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
+            testOrder,
+            new BigNumber(5),
+            testOrder.signature,
+        );
 
         defaultTransactionParams = {
-            salt: new BigNumber(
-                '57466949743788259527933166264332732046478076361192368690875627090773188231774'),
+            salt: new BigNumber('57466949743788259527933166264332732046478076361192368690875627090773188231774'),
             expirationTimeSeconds: new BigNumber(999999999),
             gasPrice: new BigNumber(1),
             signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
             data: fillTestOrderCalldata,
-             domain: {
+            domain: {
                 chainId: NETWORK_ID,
                 verifyingContract: contractAddresses.coordinator,
             },
@@ -241,8 +245,8 @@ describe('Coordinator server', () => {
             let invalidBody = {
                 signedTransaction: {
                     ...defaultTransactionParams,
-                    signature: dummySignature
-                }
+                    signature: dummySignature,
+                },
             };
             delete invalidBody.signedTransaction.signerAddress;
             const response = await request(app)
@@ -257,8 +261,8 @@ describe('Coordinator server', () => {
             const invalidBody = {
                 signedTransaction: {
                     ...defaultTransactionParams,
-                    signature: dummySignature
-                }
+                    signature: dummySignature,
+                },
             };
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
@@ -656,7 +660,9 @@ describe('Coordinator server', () => {
             expect(response.body.signatures, 'response signatures').to.not.be.undefined();
             expect(response.body.signatures.length, 'response signatures length').to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expirationTimeSeconds, 'response expiration time in seconds').to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds, 'response expiration time in seconds').to.be.greaterThan(
+                currTimestamp,
+            );
 
             // Check that fill request was added to DB
             const transactionEntityIfExists = await transactionModel.findAsync(
@@ -816,7 +822,7 @@ describe('Coordinator server', () => {
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
-        it.only('should return 400 if transaction `expirationTimeSeconds` is too high', async () => {
+        it('should return 400 if transaction `expirationTimeSeconds` is too high', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const data = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
@@ -826,12 +832,12 @@ describe('Coordinator server', () => {
             );
             const signedTransaction = createSignedTransaction(data, takerAddress);
             const txOrigin = takerAddress;
-            const maxValidExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS;
+            const maxValidExpirationTimeSeconds =
+                utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS;
             const invalidExpirationTimeSeconds = maxValidExpirationTimeSeconds + 1;
             const body = {
                 signedTransaction: {
-                    ...
-                    signedTransaction,
+                    ...signedTransaction,
                     expirtionTimeSeconds: invalidExpirationTimeSeconds,
                 },
                 txOrigin,
@@ -839,10 +845,11 @@ describe('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
-            console.log(JSON.stringify(response, null, 4));
-          //  expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-          //  expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
-           // expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.TransactionExpirationTooHigh);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.TransactionExpirationTooHigh,
+            );
         });
     });
     describe('With selective delay', () => {
@@ -930,7 +937,9 @@ describe('Coordinator server', () => {
                 .send(invalidBody);
             expect(response.status, 'status').to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code, 'code').to.be.equal(GeneralErrorCodes.ValidationError);
-            expect(response.body.validationErrors[0].code, 'validation error code').to.be.equal(ValidationErrorCodes.RequiredField);
+            expect(response.body.validationErrors[0].code, 'validation error code').to.be.equal(
+                ValidationErrorCodes.RequiredField,
+            );
             expect(response.body.validationErrors[0].field, 'validation error field').to.be.equal('orderHashes');
         });
         it('should return 200 OK & empty array if no soft cancelled order hashes could be found', async () => {

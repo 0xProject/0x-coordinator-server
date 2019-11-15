@@ -137,9 +137,7 @@ export const transactionModel = {
                     const fillAmount = _.find(transaction.takerAssetFillAmounts, { orderHash: order.hash });
                     if (fillAmount === undefined) {
                         throw new Error(
-                            `Unexpected failure. Found order in transaction without corresponding fillAmount: ${
-                                order.hash
-                            }`,
+                            `Unexpected failure. Found order in transaction without corresponding fillAmount: ${order.hash}`,
                         );
                     }
                     outstandingFillSignatures.push({

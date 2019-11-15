@@ -21,14 +21,14 @@ export class TransactionFactory {
         const domain = {
             chainId: 1337, // @todo update
             verifyingContract: this._exchangeAddress,
-        }
+        };
         const transaction = {
             salt,
             expirationTimeSeconds,
             gasPrice,
             signerAddress,
             data,
-            domain
+            domain,
         };
         const transactionHashBuffer = transactionHashUtils.getTransactionHashBuffer(transaction);
         const signature = signingUtils.signMessage(transactionHashBuffer, this._privateKey, signatureType);

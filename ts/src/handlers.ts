@@ -49,25 +49,26 @@ enum ExchangeMethods {
 }
 
 interface OrderInfo {
-    orderStatus: number,
-    orderHash: string,
-    orderTakerAssetFilledAmount: BigNumber,
+    orderStatus: number;
+    orderHash: string;
+    orderTakerAssetFilledAmount: BigNumber;
 }
 
 interface TraderInfo {
-    makerBalance: BigNumber,
-    makerAllowance: BigNumber,
-    takerBalance: BigNumber,
-    takerAllowance: BigNumber,
-    makerZrxBalance: BigNumber,
-    makerZrxAllowance: BigNumber,
-    takerZrxBalance: BigNumber,
-    takerZrxAllowance: BigNumber,
+    makerBalance: BigNumber;
+    makerAllowance: BigNumber;
+    takerBalance: BigNumber;
+    takerAllowance: BigNumber;
+    makerZrxBalance: BigNumber;
+    makerZrxAllowance: BigNumber;
+    takerZrxBalance: BigNumber;
+    takerZrxAllowance: BigNumber;
 }
 
-interface OrderAndTraderInfo { // be67c25b0
-    orderInfo: OrderInfo,
-    traderInfo: TraderInfo
+interface OrderAndTraderInfo {
+    // be67c25b0
+    orderInfo: OrderInfo;
+    traderInfo: TraderInfo;
 }
 
 export class Handlers {
@@ -414,7 +415,7 @@ export class Handlers {
                 takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketSellOrders(
                     decodedCalldata,
                     takerAddress,
-                    networkId
+                    networkId,
                 );
                 break;
             }
@@ -424,7 +425,7 @@ export class Handlers {
                 takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketBuyOrders(
                     decodedCalldata,
                     takerAddress,
-                    networkId
+                    networkId,
                 );
                 break;
             }
@@ -449,7 +450,7 @@ export class Handlers {
         const batchOrderAndTraderInfo = await this._getBatchOrderAndTraderInfoAsync(
             signedOrders,
             takerAddress,
-            networkId
+            networkId,
         );
         let totalTakerAssetAmount: BigNumber = decodedCalldata.functionArguments.takerAssetFillAmount;
         _.each(batchOrderAndTraderInfo, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
@@ -481,7 +482,7 @@ export class Handlers {
         const batchOrderAndTraderInfo = await this._getBatchOrderAndTraderInfoAsync(
             signedOrders,
             takerAddress,
-            networkId
+            networkId,
         );
         let totalMakerAssetAmount: BigNumber = decodedCalldata.functionArguments.makerAssetFillAmount;
         _.each(batchOrderAndTraderInfo, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
@@ -500,9 +501,7 @@ export class Handlers {
                 ? totalTakerAssetAmountAtOrderExchangeRate
                 : remainingFillableTakerAssetAmount;
 
-            const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(
-                takerAssetFillAmount,
-            );
+            const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(takerAssetFillAmount);
             totalMakerAssetAmount = orderCalculationUtils.getMakerFillAmount(
                 signedOrder,
                 remainingTotalTakerAssetAmount,
@@ -519,48 +518,39 @@ export class Handlers {
     ): Promise<OrderAndTraderInfo[]> {
         const contractWrappers = this._networkIdToContractWrappers[networkId];
         const signatures = _.map(signedOrders, 'signature');
-        const [orderInfos,,] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(signedOrders, signatures);
+        const [orderInfos, ,] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(
+            signedOrders,
+            signatures,
+        );
         let traderInfos: TraderInfo[] = [];
         for (const signedOrder of signedOrders) {
-            const [
-                makerBalancesAndAllowances,
-                takerBalancesAndAllowances,
-            ]
-                 = await Promise.all([
-                     // Maker balances and allowances
-                    contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(
-                        signedOrder.makerAddress,
-                        [
-                            signedOrder.makerAssetData,
-                            signedOrder.makerFeeAssetData
-                        ]
-                    ),
+            const [makerBalancesAndAllowances, takerBalancesAndAllowances] = await Promise.all([
+                // Maker balances and allowances
+                contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(signedOrder.makerAddress, [
+                    signedOrder.makerAssetData,
+                    signedOrder.makerFeeAssetData,
+                ]),
 
-                    // Taker balances and allowances
-                    contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(
-                        takerAddress,
-                        [
-                            signedOrder.takerAssetData,
-                            signedOrder.takerFeeAssetData
-                        ]
-                    ),
-                ]);
+                // Taker balances and allowances
+                contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(takerAddress, [
+                    signedOrder.takerAssetData,
+                    signedOrder.takerFeeAssetData,
+                ]),
+            ]);
 
-            traderInfos.push(
-                {
-                    // Maker
-                    makerBalance: makerBalancesAndAllowances[0][0],
-                    makerAllowance: makerBalancesAndAllowances[0][1],
-                    makerZrxBalance: makerBalancesAndAllowances[1][0],
-                    makerZrxAllowance: makerBalancesAndAllowances[1][0],
+            traderInfos.push({
+                // Maker
+                makerBalance: makerBalancesAndAllowances[0][0],
+                makerAllowance: makerBalancesAndAllowances[0][1],
+                makerZrxBalance: makerBalancesAndAllowances[1][0],
+                makerZrxAllowance: makerBalancesAndAllowances[1][0],
 
-                    // Taker
-                    takerBalance: takerBalancesAndAllowances[0][0],
-                    takerAllowance: takerBalancesAndAllowances[0][1],
-                    takerZrxBalance: takerBalancesAndAllowances[1][0],
-                    takerZrxAllowance: takerBalancesAndAllowances[1][0],
-                }
-            );
+                // Taker
+                takerBalance: takerBalancesAndAllowances[0][0],
+                takerAllowance: takerBalancesAndAllowances[0][1],
+                takerZrxBalance: takerBalancesAndAllowances[1][0],
+                takerZrxAllowance: takerBalancesAndAllowances[1][0],
+            });
         }
         const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
             orderInfo,
@@ -652,10 +642,6 @@ export class Handlers {
         // Compute approval expiration time and assert transaction expiration
         const approvalExpirationTimeSeconds =
             utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
-
-
-        //console.log('******\n\n\n\n\n',JSON.stringify(signedTransaction, null, 4));
-
         if (signedTransaction.expirationTimeSeconds.isGreaterThan(approvalExpirationTimeSeconds)) {
             throw new ValidationError([
                 {
