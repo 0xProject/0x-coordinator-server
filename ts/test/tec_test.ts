@@ -816,6 +816,34 @@ describe('Coordinator server', () => {
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
+        it.only('should return 400 if transaction `expirationTimeSeconds` is too high', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount.div(2);
+            const data = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
+                order,
+                takerAssetFillAmount,
+                order.signature,
+            );
+            const signedTransaction = createSignedTransaction(data, takerAddress);
+            const txOrigin = takerAddress;
+            const maxValidExpirationTimeSeconds = utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS;
+            const invalidExpirationTimeSeconds = maxValidExpirationTimeSeconds + 1;
+            const body = {
+                signedTransaction: {
+                    ...
+                    signedTransaction,
+                    expirtionTimeSeconds: invalidExpirationTimeSeconds,
+                },
+                txOrigin,
+            };
+            const response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            console.log(JSON.stringify(response, null, 4));
+          //  expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+          //  expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+           // expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.TransactionExpirationTooHigh);
+        });
     });
     describe('With selective delay', () => {
         before(async () => {

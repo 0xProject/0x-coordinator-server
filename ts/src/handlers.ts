@@ -252,6 +252,7 @@ export class Handlers {
         const signedTransaction: SignedZeroExTransaction = {
             ...req.body.signedTransaction,
             salt: new BigNumber(req.body.signedTransaction.salt),
+            expirationTimeSeconds: new BigNumber(req.body.signedTransaction.expirationTimeSeconds),
         };
         let decodedCalldata: DecodedCalldata;
         try {
@@ -648,8 +649,24 @@ export class Handlers {
             );
         }
 
+        // Compute approval expiration time and assert transaction expiration
         const approvalExpirationTimeSeconds =
             utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
+
+
+        //console.log('******\n\n\n\n\n',JSON.stringify(signedTransaction, null, 4));
+
+        if (signedTransaction.expirationTimeSeconds.isGreaterThan(approvalExpirationTimeSeconds)) {
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction.expirationTimeSeconds',
+                    code: ValidationErrorCodes.TransactionExpirationTooHigh,
+                    reason: `Expiration cannot exceeed ${this._configs.EXPIRATION_DURATION_SECONDS} seconds after approval by the coordinator server (expected value to be less or equal to ${approvalExpirationTimeSeconds}})`,
+                },
+            ]);
+        }
+
+        // Generate response and record in DB
         const response = await this._generateApprovalSignatureAsync(
             txOrigin,
             signedTransaction,
@@ -657,8 +674,6 @@ export class Handlers {
             networkId,
             approvalExpirationTimeSeconds,
         );
-
-        // Insert signature into DB
         await transactionModel.createAsync(
             transactionHash,
             txOrigin,
@@ -692,7 +707,7 @@ export class Handlers {
         // Since a coordinator can have multiple feeRecipientAddresses,
         // we need to make sure we issue a signature for each feeRecipientAddress
         // found in the orders submitted (i.e., someone can batch fill two coordinator
-        // orders, each with a different feeRecipientAddress). In that case, we issue a
+        // orders, each with a different feeRecipientAddress).  In that case, we issue a
         // signature/expiration for each feeRecipientAddress
         const feeRecipientAddressSet = new Set<string>();
         _.each(coordinatorOrders, o => {
