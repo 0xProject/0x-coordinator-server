@@ -41,12 +41,12 @@ export async function getAppAsync(
     const supportedChainIds = utils.getSupportedChainIds(configs);
     app.use(urlParamsParsing.bind(undefined, supportedChainIds));
 
-    app.get('/v1/ping', (_, res) => res.send('pong')); // tslint:disable-line:no-shadowed-variable
+    app.get('/v2/ping', (_, res) => res.send('pong')); // tslint:disable-line:no-shadowed-variable
 
     /**
      * GET endpoint for requesting current coordination server configuration
      */
-    app.get('/v1/configuration', ({}, response: express.Response) => {
+    app.get('/v2/configuration', ({}, response: express.Response) => {
         response
             .send({
                 expirationDurationSeconds: configs.EXPIRATION_DURATION_SECONDS,
@@ -59,12 +59,12 @@ export async function getAppAsync(
     /**
      * POST endpoint for requesting signatures for a 0x transaction
      */
-    app.post('/v1/request_transaction', asyncHandler(handlers.postRequestTransactionAsync.bind(handlers)));
+    app.post('/v2/request_transaction', asyncHandler(handlers.postRequestTransactionAsync.bind(handlers)));
 
     /**
      * POST endpoint for checking whether order hashes have been soft-cancelled or not
      */
-    app.post('/v1/soft_cancels', asyncHandler(handlers.postSoftCancelsAsync.bind(handlers)));
+    app.post('/v2/soft_cancels', asyncHandler(handlers.postSoftCancelsAsync.bind(handlers)));
 
     app.use(errorHandler);
 
@@ -88,7 +88,7 @@ export async function getAppAsync(
      */
     wss.on('request', async (request: any) => {
         // If the request isn't to the expected endpoint, reject
-        if (!_.includes(request.resourceURL.path, '/v1/requests')) {
+        if (!_.includes(request.resourceURL.path, '/v2/requests')) {
             request.reject(HttpStatus.NOT_FOUND, 'NOT_FOUND');
             return;
         }

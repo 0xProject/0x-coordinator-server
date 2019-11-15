@@ -75,14 +75,14 @@ let contractWrappers: ContractWrappers;
 // Websocket tests only
 const TEST_PORT = 8361;
 const CHAIN_ID = 1337;
-const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?chainId=${CHAIN_ID}`;
+const WS_NOTIFICATION_ENDPOINT_PATH = `/v2/requests?chainId=${CHAIN_ID}`;
 let wsClient: WebSocket.w3cwebsocket;
 
 // Shared
-const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?chainId=${CHAIN_ID}`;
+const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v2/request_transaction?chainId=${CHAIN_ID}`;
 const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
-const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v1/soft_cancels?chainId=${CHAIN_ID}`;
-const HTTP_CONFIG_ENDPOINT_PATH = `/v1/configuration`;
+const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v2/soft_cancels?chainId=${CHAIN_ID}`;
+const HTTP_CONFIG_ENDPOINT_PATH = `/v2/configuration`;
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
@@ -213,7 +213,7 @@ describe('Coordinator server', () => {
     afterEach(async () => {
         await blockchainLifecycle.revertAsync();
     });
-    describe('#/v1/configuration', () => {
+    describe('#/v2/configuration', () => {
         before(async () => {
             app = await getAppAsync(
                 {
@@ -232,7 +232,7 @@ describe('Coordinator server', () => {
             expect(response.body.supportedChainIds[0]).to.be.equal(CHAIN_ID);
         });
     });
-    describe('#/v1/request_transaction', () => {
+    describe('#/v2/request_transaction', () => {
         before(async () => {
             app = await getAppAsync(
                 {
@@ -530,7 +530,7 @@ describe('Coordinator server', () => {
                 txOrigin,
             };
             const response = await request(app)
-                .post('/v1/request_transaction?chainId=999')
+                .post('/v2/request_transaction?chainId=999')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
@@ -921,7 +921,7 @@ describe('Coordinator server', () => {
             })();
         });
     });
-    describe('#/v1/soft_cancels', () => {
+    describe('#/v2/soft_cancels', () => {
         before(async () => {
             app = await getAppAsync(
                 {
