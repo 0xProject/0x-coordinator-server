@@ -36,13 +36,12 @@ const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 enum ExchangeMethods {
     FillOrder = 'fillOrder',
     FillOrKillOrder = 'fillOrKillOrder',
-    FillOrderNoThrow = 'fillOrderNoThrow',
     BatchFillOrders = 'batchFillOrders',
     BatchFillOrKillOrders = 'batchFillOrKillOrders',
     BatchFillOrdersNoThrow = 'batchFillOrdersNoThrow',
-    MarketSellOrders = 'marketSellOrders',
+    MarketSellOrdersFillOrKill = 'marketSellOrdersFillOrKill',
     MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
-    MarketBuyOrders = 'marketBuyOrders',
+    MarketBuyOrdersFillOrKill = 'marketBuyOrdersFillOrKill',
     MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
 
     CancelOrder = 'cancelOrder',
@@ -134,7 +133,6 @@ export class Handlers {
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
             case ExchangeMethods.CancelOrder: {
                 const orderWithoutExchangeAddress = decodedCalldata.functionArguments.order;
                 const order = {
@@ -148,9 +146,9 @@ export class Handlers {
             case ExchangeMethods.BatchFillOrders:
             case ExchangeMethods.BatchFillOrKillOrders:
             case ExchangeMethods.BatchFillOrdersNoThrow:
-            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow:
-            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow:
             case ExchangeMethods.BatchCancelOrders: {
                 const ordersWithoutExchangeAddress = decodedCalldata.functionArguments.orders;
@@ -330,13 +328,12 @@ export class Handlers {
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
             case ExchangeMethods.BatchFillOrders:
             case ExchangeMethods.BatchFillOrKillOrders:
             case ExchangeMethods.BatchFillOrdersNoThrow:
-            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow:
-            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
                 const takerAddress = signedTransaction.signerAddress;
                 const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCalldataAsync(
@@ -402,7 +399,6 @@ export class Handlers {
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
                 takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
                 break;
 
@@ -412,7 +408,7 @@ export class Handlers {
                 takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
                 break;
 
-            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow: {
                 takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketSellOrders(
                     decodedCalldata,
@@ -422,7 +418,7 @@ export class Handlers {
                 break;
             }
 
-            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
                 takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketBuyOrders(
                     decodedCalldata,
