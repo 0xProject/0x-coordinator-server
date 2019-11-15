@@ -26,50 +26,15 @@ import {
     ChainIdToProvider,
     Configs,
     EventTypes,
+    ExchangeMethods,
+    OrderAndTraderInfo,
     RequestTransactionResponse,
     Response,
+    TraderInfo,
 } from './types';
 import { utils } from './utils';
 
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
-
-enum ExchangeMethods {
-    FillOrder = 'fillOrder',
-    FillOrKillOrder = 'fillOrKillOrder',
-    BatchFillOrders = 'batchFillOrders',
-    BatchFillOrKillOrders = 'batchFillOrKillOrders',
-    BatchFillOrdersNoThrow = 'batchFillOrdersNoThrow',
-    MarketSellOrdersFillOrKill = 'marketSellOrdersFillOrKill',
-    MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
-    MarketBuyOrdersFillOrKill = 'marketBuyOrdersFillOrKill',
-    MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
-
-    CancelOrder = 'cancelOrder',
-    BatchCancelOrders = 'batchCancelOrders',
-}
-
-interface OrderInfo {
-    orderStatus: number;
-    orderHash: string;
-    orderTakerAssetFilledAmount: BigNumber;
-}
-
-interface TraderInfo {
-    makerBalance: BigNumber;
-    makerAllowance: BigNumber;
-    takerBalance: BigNumber;
-    takerAllowance: BigNumber;
-    makerZrxBalance: BigNumber;
-    makerZrxAllowance: BigNumber;
-    takerZrxBalance: BigNumber;
-    takerZrxAllowance: BigNumber;
-}
-
-interface OrderAndTraderInfo {
-    // be67c25b0
-    orderInfo: OrderInfo;
-    traderInfo: TraderInfo;
-}
 
 export class Handlers {
     private readonly _chainIdToProvider: ChainIdToProvider;
@@ -690,7 +655,7 @@ export class Handlers {
         // Since a coordinator can have multiple feeRecipientAddresses,
         // we need to make sure we issue a signature for each feeRecipientAddress
         // found in the orders submitted (i.e., someone can batch fill two coordinator
-        // orders, each with a different feeRecipientAddress).  In that case, we issue a
+        // orders, each with a different feeRecipientAddress). In that case, we issue a
         // signature/expiration for each feeRecipientAddress
         const feeRecipientAddressSet = new Set<string>();
         _.each(coordinatorOrders, o => {

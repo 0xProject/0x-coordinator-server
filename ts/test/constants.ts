@@ -16,3 +16,4 @@ export const TESTRPC_PRIVATE_KEYS_STRINGS = [
 export const FEE_RECIPIENT_ADDRESS_ONE = '0xe834ec434daba538cd1b9fe1582052b880bd7e63'; // Address at index 4 from mnemonic
 export const FEE_RECIPIENT_ADDRESS_TWO = '0x78dc5d2d739606d31509c31d654056a45185ecb6'; // Address at index 5 from mnemonic
 export const DEFAULT_GAS_PRICE = new BigNumber(1);
+export const TEST_CHAIN_ID = 1337;

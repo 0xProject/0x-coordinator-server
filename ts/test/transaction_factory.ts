@@ -30,7 +30,7 @@ export class TransactionFactory {
         const gasPrice = constants.DEFAULT_GAS_PRICE;
         const signerAddress = `0x${this._signerBuff.toString('hex')}`;
         const domain = {
-            chainId: 1337, // @todo update
+            chainId: constants.TEST_CHAIN_ID,
             verifyingContract: this._exchangeAddress,
         };
         const transaction = {

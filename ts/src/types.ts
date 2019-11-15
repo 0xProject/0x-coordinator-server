@@ -105,3 +105,40 @@ export interface ChainIdToContractWrappers {
 export interface ChainIdToConnectionStore {
     [chainId: number]: Set<WebSocket.connection>;
 }
+
+export interface OrderInfo {
+    orderStatus: number;
+    orderHash: string;
+    orderTakerAssetFilledAmount: BigNumber;
+}
+
+export interface TraderInfo {
+    makerBalance: BigNumber;
+    makerAllowance: BigNumber;
+    takerBalance: BigNumber;
+    takerAllowance: BigNumber;
+    makerZrxBalance: BigNumber;
+    makerZrxAllowance: BigNumber;
+    takerZrxBalance: BigNumber;
+    takerZrxAllowance: BigNumber;
+}
+
+export interface OrderAndTraderInfo {
+    orderInfo: OrderInfo;
+    traderInfo: TraderInfo;
+}
+
+export enum ExchangeMethods {
+    FillOrder = 'fillOrder',
+    FillOrKillOrder = 'fillOrKillOrder',
+    BatchFillOrders = 'batchFillOrders',
+    BatchFillOrKillOrders = 'batchFillOrKillOrders',
+    BatchFillOrdersNoThrow = 'batchFillOrdersNoThrow',
+    MarketSellOrdersFillOrKill = 'marketSellOrdersFillOrKill',
+    MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
+    MarketBuyOrdersFillOrKill = 'marketBuyOrdersFillOrKill',
+    MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
+
+    CancelOrder = 'cancelOrder',
+    BatchCancelOrders = 'batchCancelOrders',
+}
