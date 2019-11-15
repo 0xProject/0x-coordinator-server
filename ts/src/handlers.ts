@@ -22,10 +22,10 @@ import * as requestTransactionSchema from './schemas/request_transaction_schema.
 import * as softCancelsSchema from './schemas/soft_cancels_schema.json';
 import {
     BroadcastCallback,
-    Configs,
-    EventTypes,
     ChainIdToContractWrappers,
     ChainIdToProvider,
+    Configs,
+    EventTypes,
     RequestTransactionResponse,
     Response,
 } from './types';
@@ -139,7 +139,7 @@ export class Handlers {
                 const order = {
                     ...orderWithoutExchangeAddress,
                     exchangeAddress: contractAddresses.exchange,
-                    chainId: chainId,
+                    chainId,
                 };
                 return [order];
             }
@@ -157,7 +157,7 @@ export class Handlers {
                     return {
                         ...orderWithoutExchangeAddress,
                         exchangeAddress: contractAddresses.exchange,
-                        chainId: chainId,
+                        chainId,
                     };
                 });
                 return orders;
@@ -237,7 +237,7 @@ export class Handlers {
                 ? configs.CHAIN_ID_TO_CONTRACT_ADDRESSES[chainId]
                 : undefined;
             const contractWrappers = new ContractWrappers(provider, {
-                chainId: chainId,
+                chainId,
                 contractAddresses,
             });
             this._chainIdToContractWrappers[chainId] = contractWrappers;
@@ -518,10 +518,7 @@ export class Handlers {
     ): Promise<OrderAndTraderInfo[]> {
         const contractWrappers = this._chainIdToContractWrappers[chainId];
         const signatures = _.map(signedOrders, 'signature');
-        const [orderInfos] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(
-            signedOrders,
-            signatures,
-        );
+        const [orderInfos] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(signedOrders, signatures);
         const traderInfos: TraderInfo[] = [];
         for (const signedOrder of signedOrders) {
             const [makerBalancesAndAllowances, takerBalancesAndAllowances] = await Promise.all([

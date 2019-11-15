@@ -18,9 +18,15 @@ export class TransactionFactory {
         this._exchangeAddress = exchangeAddress;
         this._signerBuff = ethUtil.privateToAddress(this._privateKey);
     }
-    public newSignedTransaction(data: string, signatureType: SignatureType, transactionData?: Partial<SignedZeroExTransaction>): SignedZeroExTransaction {
+    public newSignedTransaction(
+        data: string,
+        signatureType: SignatureType,
+        transactionData?: Partial<SignedZeroExTransaction>,
+    ): SignedZeroExTransaction {
         const salt = generatePseudoRandomSalt();
-        const expirationTimeSeconds = new BigNumber(utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS);
+        const expirationTimeSeconds = new BigNumber(
+            utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS,
+        );
         const gasPrice = constants.DEFAULT_GAS_PRICE;
         const signerAddress = `0x${this._signerBuff.toString('hex')}`;
         const domain = {
@@ -34,8 +40,7 @@ export class TransactionFactory {
             signerAddress,
             data,
             domain,
-            ...
-            transactionData,
+            ...transactionData,
         };
         const transactionHashBuffer = transactionHashUtils.getTransactionHashBuffer(transaction);
         const signature = signingUtils.signMessage(transactionHashBuffer, this._privateKey, signatureType);

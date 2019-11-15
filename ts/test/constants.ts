@@ -1,4 +1,4 @@
-import { BigNumber } from "@0x/utils";
+import { BigNumber } from '@0x/utils';
 
 export const TESTRPC_PRIVATE_KEYS_STRINGS = [
     '0xf2f48ee19680706196e2e339e5da3491186e0c4c5030670656b0e0164837257d',

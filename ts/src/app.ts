@@ -15,7 +15,7 @@ import { GeneralErrorCodes, ValidationErrorCodes } from './errors';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { urlParamsParsing } from './middleware/url_params_parsing';
-import { BroadcastMessage, Configs, ChainIdToConnectionStore, ChainIdToProvider } from './types';
+import { BroadcastMessage, ChainIdToConnectionStore, ChainIdToProvider, Configs } from './types';
 import { utils } from './utils';
 
 const chainIdToConnectionStore: ChainIdToConnectionStore = {};

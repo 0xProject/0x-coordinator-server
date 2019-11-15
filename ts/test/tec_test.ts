@@ -835,7 +835,7 @@ describe('Coordinator server', () => {
             const invalidExpirationTimeSeconds = new BigNumber(maxApproximateValidExpirationTimeSeconds + 100);
             const txData = {
                 expirationTimeSeconds: invalidExpirationTimeSeconds,
-            }
+            };
             const signedTransaction = createSignedTransaction(data, takerAddress, txData);
             const txOrigin = takerAddress;
             const body = {
@@ -1124,7 +1124,11 @@ function onMessage(client: WebSocket.w3cwebsocket, messageNumber: number): Array
     return promises;
 } // tslint:disable:max-file-line-count
 
-function createSignedTransaction(data: string, signerAddress: string, transactionData?: Partial<SignedZeroExTransaction>): SignedZeroExTransaction {
+function createSignedTransaction(
+    data: string,
+    signerAddress: string,
+    transactionData?: Partial<SignedZeroExTransaction>,
+): SignedZeroExTransaction {
     const privateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(signerAddress)];
     transactionFactory = new TransactionFactory(privateKey, contractAddresses.exchange);
     const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EIP712, transactionData);

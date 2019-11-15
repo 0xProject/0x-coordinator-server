@@ -42,9 +42,7 @@ export const utils = {
         return address;
     },
     getSupportedChainIds(configs: Configs): number[] {
-        const supportedChainIds = _.map(_.keys(configs.CHAIN_ID_TO_SETTINGS), chainIdStr =>
-            _.parseInt(chainIdStr),
-        );
+        const supportedChainIds = _.map(_.keys(configs.CHAIN_ID_TO_SETTINGS), chainIdStr => _.parseInt(chainIdStr));
         return supportedChainIds;
     },
     getCurrentTimestampSeconds(): number {
