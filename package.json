@@ -12,7 +12,7 @@
         "prettier": "prettier --write 'ts/**/*.ts' --config .prettierrc",
         "start": "node ts/lib/src/server.js",
         "lint": "tslint --project ts --format stylish --exclude ts/src/schemas/**/*",
-        "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 100000 --exit"
+        "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 10000 --exit"
     },
     "config": {
         "mnemonic": "concert load couple harbor equip island argue ramp clarify fence smart topic"

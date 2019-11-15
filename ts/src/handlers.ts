@@ -642,7 +642,7 @@ export class Handlers {
         // Compute approval expiration time and assert transaction expiration
         const approvalExpirationTimeSeconds =
             utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
-        if (signedTransaction.expirationTimeSeconds.isGreaterThan(approvalExpirationTimeSeconds)) {
+        if (signedTransaction.expirationTimeSeconds.gt(approvalExpirationTimeSeconds)) {
             throw new ValidationError([
                 {
                     field: 'signedTransaction.expirationTimeSeconds',
