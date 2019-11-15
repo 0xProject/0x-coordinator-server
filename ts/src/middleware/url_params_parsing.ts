@@ -20,7 +20,7 @@ export function urlParamsParsing(
 }
 
 function parseNetworkId(supportedNetworkIds: number[], networkIdStrIfExists?: string): number {
-    if (_.isUndefined(networkIdStrIfExists)) {
+    if (networkIdStrIfExists === undefined) {
         return constants.DEFAULT_NETWORK_ID;
     } else {
         const networkId = _.parseInt(networkIdStrIfExists);

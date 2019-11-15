@@ -242,7 +242,7 @@ describe('Coordinator server', () => {
             );
         });
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
-            let invalidBody = {
+            const invalidBody = {
                 signedTransaction: {
                     ...defaultTransactionParams,
                     signature: dummySignature,

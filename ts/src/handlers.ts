@@ -412,7 +412,7 @@ export class Handlers {
 
             case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow: {
-                takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketSellOrders(
+                takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketSellOrdersAsync(
                     decodedCalldata,
                     takerAddress,
                     networkId,
@@ -422,7 +422,7 @@ export class Handlers {
 
             case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
-                takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketBuyOrders(
+                takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketBuyOrdersAsync(
                     decodedCalldata,
                     takerAddress,
                     networkId,
@@ -435,12 +435,12 @@ export class Handlers {
         }
         return takerAssetFillAmounts;
     }
-    private async _extractTakerAssetFillAmountsFromMarketSellOrders(
+    private async _extractTakerAssetFillAmountsFromMarketSellOrdersAsync(
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
         networkId: number,
     ): Promise<BigNumber[]> {
-        let takerAssetFillAmounts: BigNumber[] = [];
+        const takerAssetFillAmounts: BigNumber[] = [];
         const contractAddresses = getContractAddressesForChainOrThrow(networkId);
         const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
             decodedCalldata.functionArguments.orders,
@@ -467,12 +467,12 @@ export class Handlers {
 
         return takerAssetFillAmounts;
     }
-    private async _extractTakerAssetFillAmountsFromMarketBuyOrders(
+    private async _extractTakerAssetFillAmountsFromMarketBuyOrdersAsync(
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
         networkId: number,
     ): Promise<BigNumber[]> {
-        let takerAssetFillAmounts: BigNumber[] = [];
+        const takerAssetFillAmounts: BigNumber[] = [];
         const contractAddresses = getContractAddressesForChainOrThrow(networkId);
         const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
             decodedCalldata.functionArguments.orders,
@@ -518,11 +518,11 @@ export class Handlers {
     ): Promise<OrderAndTraderInfo[]> {
         const contractWrappers = this._networkIdToContractWrappers[networkId];
         const signatures = _.map(signedOrders, 'signature');
-        const [orderInfos, ,] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(
+        const [orderInfos] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(
             signedOrders,
             signatures,
         );
-        let traderInfos: TraderInfo[] = [];
+        const traderInfos: TraderInfo[] = [];
         for (const signedOrder of signedOrders) {
             const [makerBalancesAndAllowances, takerBalancesAndAllowances] = await Promise.all([
                 // Maker balances and allowances

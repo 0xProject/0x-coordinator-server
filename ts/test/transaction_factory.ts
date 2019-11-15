@@ -1,8 +1,8 @@
 import { signingUtils } from '@0x/contracts-test-utils';
 import { generatePseudoRandomSalt, transactionHashUtils } from '@0x/order-utils';
 import { SignatureType, SignedZeroExTransaction } from '@0x/types';
-import * as ethUtil from 'ethereumjs-util';
 import { BigNumber } from '@0x/utils';
+import * as ethUtil from 'ethereumjs-util';
 
 export class TransactionFactory {
     private readonly _signerBuff: Buffer;
