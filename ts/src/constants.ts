@@ -1,3 +1,3 @@
 export const constants = {
-    DEFAULT_NETWORK_ID: 1,
+    DEFAULT_CHAIN_ID: 1,
 };

@@ -74,14 +74,14 @@ let contractWrappers: ContractWrappers;
 
 // Websocket tests only
 const TEST_PORT = 8361;
-const NETWORK_ID = 1337;
-const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?networkId=${NETWORK_ID}`;
+const CHAIN_ID = 1337;
+const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?chainId=${CHAIN_ID}`;
 let wsClient: WebSocket.w3cwebsocket;
 
 // Shared
-const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
+const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?chainId=${CHAIN_ID}`;
 const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
-const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v1/soft_cancels?networkId=${NETWORK_ID}`;
+const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v1/soft_cancels?chainId=${CHAIN_ID}`;
 const HTTP_CONFIG_ENDPOINT_PATH = `/v1/configuration`;
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
@@ -108,14 +108,14 @@ describe('Coordinator server', () => {
         [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
         await runMigrationsOnceAsync(provider, { from: owner });
 
-        contractAddresses = getContractAddressesForChainOrThrow(NETWORK_ID);
-        const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
+        contractAddresses = getContractAddressesForChainOrThrow(CHAIN_ID);
+        const settings: NetworkSpecificSettings = configs.CHAIN_ID_TO_SETTINGS[CHAIN_ID];
         if (feeRecipientAddress !== settings.FEE_RECIPIENTS[0].ADDRESS) {
             throw new Error(`Expected settings.FEE_RECIPEINTS[0].ADDRESS to be ${feeRecipientAddress}`);
         }
 
         contractWrappers = new ContractWrappers(provider, {
-            chainId: NETWORK_ID,
+            chainId: CHAIN_ID,
         });
 
         const defaultOrderParams = {
@@ -127,7 +127,7 @@ describe('Coordinator server', () => {
             makerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
             exchangeAddress: contractAddresses.exchange,
-            chainId: NETWORK_ID,
+            chainId: CHAIN_ID,
             senderAddress: contractAddresses.coordinator,
         };
         const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
@@ -146,7 +146,7 @@ describe('Coordinator server', () => {
             signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
             data: fillTestOrderCalldata,
             domain: {
-                chainId: NETWORK_ID,
+                chainId: CHAIN_ID,
                 verifyingContract: contractAddresses.coordinator,
             },
         };
@@ -217,7 +217,7 @@ describe('Coordinator server', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -227,16 +227,16 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.expirationDurationSeconds).to.be.equal(configs.EXPIRATION_DURATION_SECONDS);
             expect(response.body.selectiveDelayMs).to.be.equal(configs.SELECTIVE_DELAY_MS);
-            expect(response.body.supportedNetworkIds).to.be.instanceOf(Array);
-            expect(response.body.supportedNetworkIds).to.have.length(1);
-            expect(response.body.supportedNetworkIds[0]).to.be.equal(NETWORK_ID);
+            expect(response.body.supportedChainIds).to.be.instanceOf(Array);
+            expect(response.body.supportedChainIds).to.have.length(1);
+            expect(response.body.supportedChainIds[0]).to.be.equal(CHAIN_ID);
         });
     });
     describe('#/v1/request_transaction', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -515,7 +515,7 @@ describe('Coordinator server', () => {
             );
             expect(response.body.cancellationSignatures.length).to.be.equal(1);
         });
-        it('should return 400 if request specifies unsupported networkId', async () => {
+        it('should return 400 if request specifies unsupported chainId', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const data = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
@@ -530,12 +530,12 @@ describe('Coordinator server', () => {
                 txOrigin,
             };
             const response = await request(app)
-                .post('/v1/request_transaction?networkId=999')
+                .post('/v1/request_transaction?chainId=999')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.UnsupportedOption);
-            expect(response.body.validationErrors[0].field).to.be.equal('networkId');
+            expect(response.body.validationErrors[0].field).to.be.equal('chainId');
         });
         it('should return 200 OK if request to batchFill 2 orders each with a different, supported feeRecipientAddress', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync({
@@ -860,7 +860,7 @@ describe('Coordinator server', () => {
             };
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configWithDelay,
             );
@@ -925,7 +925,7 @@ describe('Coordinator server', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -1000,7 +1000,7 @@ describe('Coordinator server', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );

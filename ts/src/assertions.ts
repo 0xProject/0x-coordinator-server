@@ -19,9 +19,9 @@ export function assertConfigsAreValid(configs: Configs): void {
     assertEnvVarType('SELECTIVE_DELAY_MS', configs.SELECTIVE_DELAY_MS, EnvVarType.Integer);
     assertEnvVarType('EXPIRATION_DURATION_SECONDS', configs.EXPIRATION_DURATION_SECONDS, EnvVarType.Integer);
 
-    const networkIds = _.keys(configs.NETWORK_ID_TO_SETTINGS);
-    _.each(networkIds, networkId => assert.isNumber('networkId', _.parseInt(networkId)));
-    const networkSpecificSettings = _.values(configs.NETWORK_ID_TO_SETTINGS);
+    const chainIds = _.keys(configs.CHAIN_ID_TO_SETTINGS);
+    _.each(chainIds, chainId => assert.isNumber('chainId', _.parseInt(chainId)));
+    const networkSpecificSettings = _.values(configs.CHAIN_ID_TO_SETTINGS);
     _.each(networkSpecificSettings, (settings: NetworkSpecificSettings) => {
         _.each(settings.FEE_RECIPIENTS, (feeRecipient: FeeRecipient, i: number) => {
             assert.isETHAddressHex(`settings.FEE_RECIPIENTS[${i}].ADDRESS`, feeRecipient.ADDRESS);

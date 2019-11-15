@@ -41,11 +41,11 @@ export const utils = {
         const address = ethUtil.addHexPrefix(addressBuf.toString('hex'));
         return address;
     },
-    getSupportedNetworkIds(configs: Configs): number[] {
-        const supportedNetworkIds = _.map(_.keys(configs.NETWORK_ID_TO_SETTINGS), networkIdStr =>
-            _.parseInt(networkIdStr),
+    getSupportedChainIds(configs: Configs): number[] {
+        const supportedChainIds = _.map(_.keys(configs.CHAIN_ID_TO_SETTINGS), chainIdStr =>
+            _.parseInt(chainIdStr),
         );
-        return supportedNetworkIds;
+        return supportedChainIds;
     },
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);
