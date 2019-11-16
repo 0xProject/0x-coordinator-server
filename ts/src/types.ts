@@ -117,10 +117,10 @@ export interface TraderInfo {
     makerAllowance: BigNumber;
     takerBalance: BigNumber;
     takerAllowance: BigNumber;
-    makerZrxBalance: BigNumber;
-    makerZrxAllowance: BigNumber;
-    takerZrxBalance: BigNumber;
-    takerZrxAllowance: BigNumber;
+    makerFeeBalance: BigNumber;
+    makerFeeAllowance: BigNumber;
+    takerFeeBalance: BigNumber;
+    takerFeeAllowance: BigNumber;
 }
 
 export interface OrderAndTraderInfo {

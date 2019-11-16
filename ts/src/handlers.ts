@@ -67,24 +67,24 @@ export class Handlers {
         );
         minSet.push(maxTakerAssetFillAmountGivenMakerConstraints);
 
-        // Calculate min of balance & allowance of taker's ZRX -> translate into takerAsset amount
+        // Calculate min of balance & allowance of taker's Fee -> translate into takerAsset amount
         if (!signedOrder.takerFee.eq(0)) {
-            const takerZRXAvailable = BigNumber.min(traderInfo.takerZrxBalance, traderInfo.takerZrxAllowance);
-            const maxTakerAssetFillAmountGivenTakerZRXConstraints = takerZRXAvailable
+            const takerFeeAvailable = BigNumber.min(traderInfo.takerFeeBalance, traderInfo.takerFeeAllowance);
+            const maxTakerAssetFillAmountGivenTakerFeeConstraints = takerFeeAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.takerFee)
                 .integerValue(BigNumber.ROUND_FLOOR);
-            minSet.push(maxTakerAssetFillAmountGivenTakerZRXConstraints);
+            minSet.push(maxTakerAssetFillAmountGivenTakerFeeConstraints);
         }
 
-        // Calculate min of balance & allowance of maker's ZRX -> translate into takerAsset amount
+        // Calculate min of balance & allowance of maker's Fee -> translate into takerAsset amount
         if (!signedOrder.makerFee.eq(0)) {
-            const makerZRXAvailable = BigNumber.min(traderInfo.makerZrxBalance, traderInfo.makerZrxAllowance);
-            const maxTakerAssetFillAmountGivenMakerZRXConstraints = makerZRXAvailable
+            const makerFeeAvailable = BigNumber.min(traderInfo.makerFeeBalance, traderInfo.makerFeeAllowance);
+            const maxTakerAssetFillAmountGivenMakerFeeConstraints = makerFeeAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.makerFee)
                 .integerValue(BigNumber.ROUND_FLOOR);
-            minSet.push(maxTakerAssetFillAmountGivenMakerZRXConstraints);
+            minSet.push(maxTakerAssetFillAmountGivenMakerFeeConstraints);
         }
 
         const remainingTakerAssetFillAmount = signedOrder.takerAssetAmount.minus(orderInfo.orderTakerAssetFilledAmount);
@@ -504,14 +504,14 @@ export class Handlers {
                 // Maker
                 makerBalance: makerBalancesAndAllowances[0][0],
                 makerAllowance: makerBalancesAndAllowances[0][1],
-                makerZrxBalance: makerBalancesAndAllowances[1][0],
-                makerZrxAllowance: makerBalancesAndAllowances[1][0],
+                makerFeeBalance: makerBalancesAndAllowances[1][0],
+                makerFeeAllowance: makerBalancesAndAllowances[1][1],
 
                 // Taker
                 takerBalance: takerBalancesAndAllowances[0][0],
                 takerAllowance: takerBalancesAndAllowances[0][1],
-                takerZrxBalance: takerBalancesAndAllowances[1][0],
-                takerZrxAllowance: takerBalancesAndAllowances[1][0],
+                takerFeeBalance: takerBalancesAndAllowances[1][0],
+                takerFeeAllowance: takerBalancesAndAllowances[1][1],
             });
         }
         const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
