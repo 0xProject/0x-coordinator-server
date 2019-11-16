@@ -1,5 +1,5 @@
 import { CoordinatorContract, ERC20TokenContract } from '@0x/abi-gen-wrappers';
-import { ContractAddresses, getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
+import { ContractAddresses, getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import { constants as testConstants, OrderFactory } from '@0x/contracts-test-utils';
@@ -74,24 +74,31 @@ let contractWrappers: ContractWrappers;
 
 // Websocket tests only
 const TEST_PORT = 8361;
-const NETWORK_ID = 50;
-const WS_NOTIFICATION_ENDPOINT_PATH = `/v1/requests?networkId=${NETWORK_ID}`;
+const CHAIN_ID = 1337;
+const WS_NOTIFICATION_ENDPOINT_PATH = `/v2/requests?chainId=${CHAIN_ID}`;
 let wsClient: WebSocket.w3cwebsocket;
 
 // Shared
-const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v1/request_transaction?networkId=${NETWORK_ID}`;
+const HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH = `/v2/request_transaction?chainId=${CHAIN_ID}`;
 const HTTP_REQUEST_TRANSACTION_URL = `http://127.0.0.1:${TEST_PORT}${HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH}`;
-const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v1/soft_cancels?networkId=${NETWORK_ID}`;
-const HTTP_CONFIG_ENDPOINT_PATH = `/v1/configuration`;
+const HTTP_SOFT_CANCELS_ENDPOINT_PATH = `/v2/soft_cancels?chainId=${CHAIN_ID}`;
+const HTTP_CONFIG_ENDPOINT_PATH = `/v2/configuration`;
 const DEFAULT_MAKER_TOKEN_ADDRESS = '0x34d402f14d58e001d8efbe6585051bf9706aa064';
 const DEFAULT_TAKER_TOKEN_ADDRESS = '0x25b8fe1de9daf8ba351890744ff28cf7dfa8f5e3';
 const NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS = '0xb27ec3571c6abaa95db65ee7fec60fb694cbf822';
 
+let defaultTransactionParams: ZeroExTransaction;
+const dummySignature =
+    '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03';
+
 describe('Coordinator server', () => {
     before(async () => {
-        provider = web3Factory.getRpcProvider({
+        const ganacheConfigs = {
+            total_accounts: 10,
             shouldUseInProcessGanache: true,
-        });
+            shouldAllowUnlimitedContractSize: true,
+        };
+        provider = web3Factory.getRpcProvider(ganacheConfigs);
 
         web3Wrapper = new Web3Wrapper(provider);
         blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
@@ -101,27 +108,48 @@ describe('Coordinator server', () => {
         [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
         await runMigrationsOnceAsync(provider, { from: owner });
 
-        contractAddresses = getContractAddressesForNetworkOrThrow(NETWORK_ID);
-        const settings: NetworkSpecificSettings = configs.NETWORK_ID_TO_SETTINGS[NETWORK_ID];
+        contractAddresses = getContractAddressesForChainOrThrow(CHAIN_ID);
+        const settings: NetworkSpecificSettings = configs.CHAIN_ID_TO_SETTINGS[CHAIN_ID];
         if (feeRecipientAddress !== settings.FEE_RECIPIENTS[0].ADDRESS) {
             throw new Error(`Expected settings.FEE_RECIPEINTS[0].ADDRESS to be ${feeRecipientAddress}`);
         }
 
+        contractWrappers = new ContractWrappers(provider, {
+            chainId: CHAIN_ID,
+        });
+
         const defaultOrderParams = {
             ...testConstants.STATIC_ORDER_PARAMS,
-            senderAddress: contractAddresses.coordinator,
-            exchangeAddress: contractAddresses.exchange,
             makerAddress,
             feeRecipientAddress,
             makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
             takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
+            makerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
+            takerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
+            exchangeAddress: contractAddresses.exchange,
+            chainId: CHAIN_ID,
+            senderAddress: contractAddresses.coordinator,
         };
         const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
+        const testOrder = await orderFactory.newSignedOrderAsync();
+        const fillTestOrderCalldata = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
+            testOrder,
+            new BigNumber(5),
+            testOrder.signature,
+        );
 
-        contractWrappers = new ContractWrappers(provider, {
-            networkId: NETWORK_ID,
-        });
+        defaultTransactionParams = {
+            salt: new BigNumber('57466949743788259527933166264332732046478076361192368690875627090773188231774'),
+            expirationTimeSeconds: new BigNumber(999999999),
+            gasPrice: new BigNumber(1),
+            signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
+            data: fillTestOrderCalldata,
+            domain: {
+                chainId: CHAIN_ID,
+                verifyingContract: contractAddresses.coordinator,
+            },
+        };
 
         makerTokenContract = new DummyERC20TokenContract(DEFAULT_MAKER_TOKEN_ADDRESS, provider);
         takerTokenContract = new DummyERC20TokenContract(DEFAULT_TAKER_TOKEN_ADDRESS, provider);
@@ -185,11 +213,11 @@ describe('Coordinator server', () => {
     afterEach(async () => {
         await blockchainLifecycle.revertAsync();
     });
-    describe('#/v1/configuration', () => {
+    describe('#/v2/configuration', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -199,16 +227,16 @@ describe('Coordinator server', () => {
             expect(response.status).to.be.equal(HttpStatus.OK);
             expect(response.body.expirationDurationSeconds).to.be.equal(configs.EXPIRATION_DURATION_SECONDS);
             expect(response.body.selectiveDelayMs).to.be.equal(configs.SELECTIVE_DELAY_MS);
-            expect(response.body.supportedNetworkIds).to.be.instanceOf(Array);
-            expect(response.body.supportedNetworkIds).to.have.length(1);
-            expect(response.body.supportedNetworkIds[0]).to.be.equal(NETWORK_ID);
+            expect(response.body.supportedChainIds).to.be.instanceOf(Array);
+            expect(response.body.supportedChainIds).to.have.length(1);
+            expect(response.body.supportedChainIds[0]).to.be.equal(CHAIN_ID);
         });
     });
-    describe('#/v1/request_transaction', () => {
+    describe('#/v2/request_transaction', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -216,17 +244,11 @@ describe('Coordinator server', () => {
         it('should return 400 Bad Request if request body does not conform to schema', async () => {
             const invalidBody = {
                 signedTransaction: {
-                    // Missing signerAddress
-                    salt: new BigNumber(
-                        '10798369788836331947878244228295394663118854512666292664573150674534689981547',
-                    ),
-                    data:
-                        '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c5f2b93a6902335d6d05d92895df0a8c381bfc14c342d58df4f926ee938fa1871677f7c000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b1b52aa1994a139883072845a049e4bfda827a5ab435a7f417e37c7bc18663362306d5a9e50f8aa110330987731be51dbfe69a2a0de2c4103da79dbb42b3070b203000000000000000000000000000000000000000000000000000000000000',
-                    verifyingContractAddress: contractAddresses.coordinator,
-                    signature:
-                        '0x1cc0b3a07c8bd0346e8ad34278beb28f5b90720ccfde3fe761333971e2b130abd75546534e8d8f0b476c201c573ffeb0c24ed2753ba70e4fe68820075b5eaf1a0003',
+                    ...defaultTransactionParams,
+                    signature: dummySignature,
                 },
             };
+            delete invalidBody.signedTransaction.signerAddress;
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(invalidBody);
@@ -238,16 +260,8 @@ describe('Coordinator server', () => {
         it('should return 400 Bad Request if signature is invalid', async () => {
             const invalidBody = {
                 signedTransaction: {
-                    salt: new BigNumber(
-                        '57466949743788259527933166264332732046478076361192368690875627090773188231774',
-                    ),
-                    signerAddress: '0xe834ec434daba538cd1b9fe1582052b880bd7e63',
-                    data:
-                        '0xb4be83d500000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000000000000000002a0000000000000000000000000e36ea790bc9d7ab70c55260c66d52b1eca985f84000000000000000000000000000000000000000000000000000000000000000000000000000000000000000078dc5d2d739606d31509c31d654056a45185ecb60000000000000000000000006ecbe1db9ef729cbe972c83fb886247691fb6beb0000000000000000000000000000000000000000000000056bc75e2d6310000000000000000000000000000000000000000000000000000ad78ebc5ac62000000000000000000000000000000000000000000000000000000de0b6b3a76400000000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000005c6dfa8c3aeb4634b714b7f4f0b235cf8b77707f0c8d36d1ea8b28b44560c5caa323d855000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000001e00000000000000000000000000000000000000000000000000000000000000024f47261b00000000000000000000000001e2f9e10d02a6b8f8f69fcbf515e75039d2ea30d000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000024f47261b0000000000000000000000000be0037eaf2d64fe5529bca93c18c9702d39303760000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000421b2f1cd06f64e08a71d6cb579a086c356f313ebc2aeeb66a827408aab78439ec7724dfd59fbad7a4c8009f893f724cab90d0f82f45c49f9f76c7e1d7a2c7f2ca4203000000000000000000000000000000000000000000000000000000000000',
-                    verifyingContractAddress: contractAddresses.coordinator,
-                    // Invalid signature
-                    signature:
-                        '0x1b73ae1c93d58da1162dcf896111afce37439f1f24adcbeb7a9c7407920a3bd3010fad757de911d8b5e1067dd210aca35a027dd154a0167c4a15278af22904b70b03',
+                    ...defaultTransactionParams,
+                    signature: dummySignature,
                 },
             };
             const response = await request(app)
@@ -501,7 +515,7 @@ describe('Coordinator server', () => {
             );
             expect(response.body.cancellationSignatures.length).to.be.equal(1);
         });
-        it('should return 400 if request specifies unsupported networkId', async () => {
+        it('should return 400 if request specifies unsupported chainId', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
             const data = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
@@ -516,12 +530,12 @@ describe('Coordinator server', () => {
                 txOrigin,
             };
             const response = await request(app)
-                .post('/v1/request_transaction?networkId=999')
+                .post('/v2/request_transaction?chainId=999')
                 .send(body);
             expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
             expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.UnsupportedOption);
-            expect(response.body.validationErrors[0].field).to.be.equal('networkId');
+            expect(response.body.validationErrors[0].field).to.be.equal('chainId');
         });
         it('should return 200 OK if request to batchFill 2 orders each with a different, supported feeRecipientAddress', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync({
@@ -622,14 +636,14 @@ describe('Coordinator server', () => {
                 testConstants.AWAIT_TRANSACTION_MINED_MS,
             );
         });
-        it('should return 200 OK if request to marketSell uncancelled orders', async () => {
+        it('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
             // 1.5X the total fillAmount of the two orders
             const orderOneTakerAssetFillAmount = orderOne.takerAssetAmount;
             const orderTwoTakerAssetFillAmount = orderTwo.takerAssetAmount.div(2);
             const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
-            const data = contractWrappers.exchange.marketSellOrders.getABIEncodedTransactionData(
+            const data = contractWrappers.exchange.marketSellOrdersNoThrow.getABIEncodedTransactionData(
                 [orderOne, orderTwo],
                 takerAssetFillAmount,
                 [orderOne.signature, orderTwo.signature],
@@ -642,11 +656,13 @@ describe('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
                 .send(body);
-            expect(response.status).to.be.equal(HttpStatus.OK);
-            expect(response.body.signatures).to.not.be.undefined();
-            expect(response.body.signatures.length).to.be.equal(1);
+            expect(response.status, 'response status').to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures, 'response signatures').to.not.be.undefined();
+            expect(response.body.signatures.length, 'response signatures length').to.be.equal(1);
             const currTimestamp = utils.getCurrentTimestampSeconds();
-            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+            expect(response.body.expirationTimeSeconds, 'response expiration time in seconds').to.be.greaterThan(
+                currTimestamp,
+            );
 
             // Check that fill request was added to DB
             const transactionEntityIfExists = await transactionModel.findAsync(
@@ -681,7 +697,7 @@ describe('Coordinator server', () => {
             const orderOneMakerAssetFillAmount = orderOne.makerAssetAmount;
             const orderTwoMakerAssetFillAmount = orderTwo.makerAssetAmount.div(2);
             const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
-            const data = contractWrappers.exchange.marketBuyOrders.getABIEncodedTransactionData(
+            const data = contractWrappers.exchange.marketBuyOrdersNoThrow.getABIEncodedTransactionData(
                 [orderOne, orderTwo],
                 makerAssetFillAmount,
                 [orderOne.signature, orderTwo.signature],
@@ -806,6 +822,35 @@ describe('Coordinator server', () => {
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(response.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
         });
+        it('should return 400 if transaction `expirationTimeSeconds` is too high', async () => {
+            const order = await orderFactory.newSignedOrderAsync();
+            const takerAssetFillAmount = order.takerAssetAmount.div(2);
+            const data = contractWrappers.exchange.fillOrder.getABIEncodedTransactionData(
+                order,
+                takerAssetFillAmount,
+                order.signature,
+            );
+            const maxApproximateValidExpirationTimeSeconds =
+                utils.getCurrentTimestampSeconds() + configs.EXPIRATION_DURATION_SECONDS;
+            const invalidExpirationTimeSeconds = new BigNumber(maxApproximateValidExpirationTimeSeconds + 100);
+            const txData = {
+                expirationTimeSeconds: invalidExpirationTimeSeconds,
+            };
+            const signedTransaction = createSignedTransaction(data, takerAddress, txData);
+            const txOrigin = takerAddress;
+            const body = {
+                signedTransaction,
+                txOrigin,
+            };
+            const response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code).to.be.equal(
+                ValidationErrorCodes.TransactionExpirationTooHigh,
+            );
+        });
     });
     describe('With selective delay', () => {
         before(async () => {
@@ -815,7 +860,7 @@ describe('Coordinator server', () => {
             };
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configWithDelay,
             );
@@ -876,11 +921,11 @@ describe('Coordinator server', () => {
             })();
         });
     });
-    describe('#/v1/soft_cancels', () => {
+    describe('#/v2/soft_cancels', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -890,10 +935,12 @@ describe('Coordinator server', () => {
             const response = await request(app)
                 .post(HTTP_SOFT_CANCELS_ENDPOINT_PATH)
                 .send(invalidBody);
-            expect(response.status).to.be.equal(HttpStatus.BAD_REQUEST);
-            expect(response.body.code).to.be.equal(GeneralErrorCodes.ValidationError);
-            expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.RequiredField);
-            expect(response.body.validationErrors[0].field).to.be.equal('orderHashes');
+            expect(response.status, 'status').to.be.equal(HttpStatus.BAD_REQUEST);
+            expect(response.body.code, 'code').to.be.equal(GeneralErrorCodes.ValidationError);
+            expect(response.body.validationErrors[0].code, 'validation error code').to.be.equal(
+                ValidationErrorCodes.RequiredField,
+            );
+            expect(response.body.validationErrors[0].field, 'validation error field').to.be.equal('orderHashes');
         });
         it('should return 200 OK & empty array if no soft cancelled order hashes could be found', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -953,7 +1000,7 @@ describe('Coordinator server', () => {
         before(async () => {
             app = await getAppAsync(
                 {
-                    [NETWORK_ID]: provider,
+                    [CHAIN_ID]: provider,
                 },
                 configs,
             );
@@ -1077,9 +1124,13 @@ function onMessage(client: WebSocket.w3cwebsocket, messageNumber: number): Array
     return promises;
 } // tslint:disable:max-file-line-count
 
-function createSignedTransaction(data: string, signerAddress: string): SignedZeroExTransaction {
+function createSignedTransaction(
+    data: string,
+    signerAddress: string,
+    transactionData?: Partial<SignedZeroExTransaction>,
+): SignedZeroExTransaction {
     const privateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(signerAddress)];
     transactionFactory = new TransactionFactory(privateKey, contractAddresses.exchange);
-    const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EIP712);
+    const signedTransaction = transactionFactory.newSignedTransaction(data, SignatureType.EIP712, transactionData);
     return signedTransaction;
 }

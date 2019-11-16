@@ -48,4 +48,5 @@ export enum ValidationErrorCodes {
     FunctionCallUnsupported = 1009,
     FillRequestsExceededTakerAssetAmount = 1010,
     TransactionAlreadyUsed = 1011,
+    TransactionExpirationTooHigh = 1012,
 }

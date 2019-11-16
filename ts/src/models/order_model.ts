@@ -25,7 +25,7 @@ export const orderModel = {
     },
     async isSoftCancelledAsync(order: Order): Promise<boolean> {
         const orderIfExists = await orderModel.findAsync(order);
-        return !_.isUndefined(orderIfExists) && orderIfExists.isSoftCancelled;
+        return orderIfExists !== undefined && orderIfExists.isSoftCancelled;
     },
     async findSoftCancelledOrdersAsync(orders: Order[]): Promise<string[]> {
         const orderHashes = _.map(orders, order => orderModel.getHash(order));

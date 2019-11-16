@@ -1,5 +1,5 @@
-import { getContractAddressesForNetworkOrThrow } from '@0x/contract-addresses';
-import { ContractWrappers, OrderAndTraderInfo } from '@0x/contract-wrappers';
+import { getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
+import { ContractWrappers } from '@0x/contract-wrappers';
 import {
     eip712Utils,
     orderCalculationUtils,
@@ -22,37 +22,24 @@ import * as requestTransactionSchema from './schemas/request_transaction_schema.
 import * as softCancelsSchema from './schemas/soft_cancels_schema.json';
 import {
     BroadcastCallback,
+    ChainIdToContractWrappers,
+    ChainIdToProvider,
     Configs,
     EventTypes,
-    NetworkIdToContractWrappers,
-    NetworkIdToProvider,
+    ExchangeMethods,
+    OrderAndTraderInfo,
     RequestTransactionResponse,
     Response,
+    TraderInfo,
 } from './types';
 import { utils } from './utils';
 
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
-enum ExchangeMethods {
-    FillOrder = 'fillOrder',
-    FillOrKillOrder = 'fillOrKillOrder',
-    FillOrderNoThrow = 'fillOrderNoThrow',
-    BatchFillOrders = 'batchFillOrders',
-    BatchFillOrKillOrders = 'batchFillOrKillOrders',
-    BatchFillOrdersNoThrow = 'batchFillOrdersNoThrow',
-    MarketSellOrders = 'marketSellOrders',
-    MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
-    MarketBuyOrders = 'marketBuyOrders',
-    MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
-
-    CancelOrder = 'cancelOrder',
-    BatchCancelOrders = 'batchCancelOrders',
-}
-
 export class Handlers {
-    private readonly _networkIdToProvider: NetworkIdToProvider;
+    private readonly _chainIdToProvider: ChainIdToProvider;
     private readonly _broadcastCallback: BroadcastCallback;
-    private readonly _networkIdToContractWrappers: NetworkIdToContractWrappers;
+    private readonly _chainIdToContractWrappers: ChainIdToContractWrappers;
     private readonly _configs: Configs;
     private static _calculateRemainingFillableTakerAssetAmount(
         signedOrder: SignedOrder,
@@ -80,24 +67,24 @@ export class Handlers {
         );
         minSet.push(maxTakerAssetFillAmountGivenMakerConstraints);
 
-        // Calculate min of balance & allowance of taker's ZRX -> translate into takerAsset amount
+        // Calculate min of balance & allowance of taker's Fee -> translate into takerAsset amount
         if (!signedOrder.takerFee.eq(0)) {
-            const takerZRXAvailable = BigNumber.min(traderInfo.takerZrxBalance, traderInfo.takerZrxAllowance);
-            const maxTakerAssetFillAmountGivenTakerZRXConstraints = takerZRXAvailable
+            const takerFeeAvailable = BigNumber.min(traderInfo.takerFeeBalance, traderInfo.takerFeeAllowance);
+            const maxTakerAssetFillAmountGivenTakerFeeConstraints = takerFeeAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.takerFee)
                 .integerValue(BigNumber.ROUND_FLOOR);
-            minSet.push(maxTakerAssetFillAmountGivenTakerZRXConstraints);
+            minSet.push(maxTakerAssetFillAmountGivenTakerFeeConstraints);
         }
 
-        // Calculate min of balance & allowance of maker's ZRX -> translate into takerAsset amount
+        // Calculate min of balance & allowance of maker's Fee -> translate into takerAsset amount
         if (!signedOrder.makerFee.eq(0)) {
-            const makerZRXAvailable = BigNumber.min(traderInfo.makerZrxBalance, traderInfo.makerZrxAllowance);
-            const maxTakerAssetFillAmountGivenMakerZRXConstraints = makerZRXAvailable
+            const makerFeeAvailable = BigNumber.min(traderInfo.makerFeeBalance, traderInfo.makerFeeAllowance);
+            const maxTakerAssetFillAmountGivenMakerFeeConstraints = makerFeeAvailable
                 .multipliedBy(signedOrder.takerAssetAmount)
                 .div(signedOrder.makerFee)
                 .integerValue(BigNumber.ROUND_FLOOR);
-            minSet.push(maxTakerAssetFillAmountGivenMakerZRXConstraints);
+            minSet.push(maxTakerAssetFillAmountGivenMakerFeeConstraints);
         }
 
         const remainingTakerAssetFillAmount = signedOrder.takerAssetAmount.minus(orderInfo.orderTakerAssetFilledAmount);
@@ -106,18 +93,18 @@ export class Handlers {
         const maxTakerAssetFillAmount = BigNumber.min(...minSet);
         return maxTakerAssetFillAmount;
     }
-    private static _getOrdersFromDecodedCalldata(decodedCalldata: DecodedCalldata, networkId: number): Order[] {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
+    private static _getOrdersFromDecodedCalldata(decodedCalldata: DecodedCalldata, chainId: number): Order[] {
+        const contractAddresses = getContractAddressesForChainOrThrow(chainId);
 
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
             case ExchangeMethods.CancelOrder: {
                 const orderWithoutExchangeAddress = decodedCalldata.functionArguments.order;
                 const order = {
                     ...orderWithoutExchangeAddress,
                     exchangeAddress: contractAddresses.exchange,
+                    chainId,
                 };
                 return [order];
             }
@@ -125,9 +112,9 @@ export class Handlers {
             case ExchangeMethods.BatchFillOrders:
             case ExchangeMethods.BatchFillOrKillOrders:
             case ExchangeMethods.BatchFillOrdersNoThrow:
-            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow:
-            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow:
             case ExchangeMethods.BatchCancelOrders: {
                 const ordersWithoutExchangeAddress = decodedCalldata.functionArguments.orders;
@@ -135,6 +122,7 @@ export class Handlers {
                     return {
                         ...orderWithoutExchangeAddress,
                         exchangeAddress: contractAddresses.exchange,
+                        chainId,
                     };
                 });
                 return orders;
@@ -203,37 +191,38 @@ export class Handlers {
             throw new ValidationError(validationErrors);
         }
     }
-    constructor(networkIdToProvider: NetworkIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
-        this._networkIdToProvider = networkIdToProvider;
+    constructor(chainIdToProvider: ChainIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
+        this._chainIdToProvider = chainIdToProvider;
         this._broadcastCallback = broadcastCallback;
         this._configs = configs;
-        this._networkIdToContractWrappers = {};
-        _.each(networkIdToProvider, (provider: Web3ProviderEngine, networkIdStr: string) => {
-            const networkId = _.parseInt(networkIdStr);
-            const contractAddresses = configs.NETWORK_ID_TO_CONTRACT_ADDRESSES
-                ? configs.NETWORK_ID_TO_CONTRACT_ADDRESSES[networkId]
+        this._chainIdToContractWrappers = {};
+        _.each(chainIdToProvider, (provider: Web3ProviderEngine, chainIdStr: string) => {
+            const chainId = _.parseInt(chainIdStr);
+            const contractAddresses = configs.CHAIN_ID_TO_CONTRACT_ADDRESSES
+                ? configs.CHAIN_ID_TO_CONTRACT_ADDRESSES[chainId]
                 : undefined;
             const contractWrappers = new ContractWrappers(provider, {
-                networkId,
+                chainId,
                 contractAddresses,
             });
-            this._networkIdToContractWrappers[networkId] = contractWrappers;
+            this._chainIdToContractWrappers[chainId] = contractWrappers;
         });
     }
     public async postRequestTransactionAsync(req: express.Request, res: express.Response): Promise<void> {
         // 1. Validate request schema
         utils.validateSchema(req.body, requestTransactionSchema);
         const txOrigin = req.body.txOrigin;
-        const networkId = req.networkId;
+        const chainId = req.chainId;
 
         // 2. Decode the supplied transaction data
         const signedTransaction: SignedZeroExTransaction = {
             ...req.body.signedTransaction,
             salt: new BigNumber(req.body.signedTransaction.salt),
+            expirationTimeSeconds: new BigNumber(req.body.signedTransaction.expirationTimeSeconds),
         };
         let decodedCalldata: DecodedCalldata;
         try {
-            const contractWrappers = this._networkIdToContractWrappers[networkId];
+            const contractWrappers = this._chainIdToContractWrappers[chainId];
             decodedCalldata = contractWrappers
                 .getAbiDecoder()
                 .decodeCalldataOrThrow(signedTransaction.data, 'Exchange');
@@ -249,9 +238,9 @@ export class Handlers {
 
         // 3. Check if at least one order in calldata has the Coordinator's feeRecipientAddress
         let orders: Order[] = [];
-        orders = Handlers._getOrdersFromDecodedCalldata(decodedCalldata, networkId);
+        orders = Handlers._getOrdersFromDecodedCalldata(decodedCalldata, chainId);
         const coordinatorOrders = _.filter(orders, order => {
-            const coordinatorFeeRecipients = this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS;
+            const coordinatorFeeRecipients = this._configs.CHAIN_ID_TO_SETTINGS[chainId].FEE_RECIPIENTS;
             const coordinatorFeeRecipientAddresses = _.map(
                 coordinatorFeeRecipients,
                 feeRecipient => feeRecipient.ADDRESS,
@@ -285,7 +274,7 @@ export class Handlers {
         }
 
         // 5. Validate the 0x transaction signature
-        const provider = this._networkIdToProvider[networkId];
+        const provider = this._chainIdToProvider[chainId];
         const isValidSignature = await signatureUtils.isValidSignatureAsync(
             provider,
             transactionHash,
@@ -306,26 +295,25 @@ export class Handlers {
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
             case ExchangeMethods.BatchFillOrders:
             case ExchangeMethods.BatchFillOrKillOrders:
             case ExchangeMethods.BatchFillOrdersNoThrow:
-            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow:
-            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
                 const takerAddress = signedTransaction.signerAddress;
                 const takerAssetFillAmounts = await this._getTakerAssetFillAmountsFromDecodedCalldataAsync(
                     decodedCalldata,
                     takerAddress,
-                    networkId,
+                    chainId,
                 );
                 const response = await this._handleFillsAsync(
                     coordinatorOrders,
                     txOrigin,
                     signedTransaction,
                     takerAssetFillAmounts,
-                    networkId,
+                    chainId,
                 );
                 res.status(response.status).send(response.body);
                 // After responding to taker's request, we broadcast the fill acceptance to all WS connections
@@ -340,7 +328,7 @@ export class Handlers {
                         approvalExpirationTimeSeconds: response.body.expirationTimeSeconds,
                     },
                 };
-                this._broadcastCallback(fillRequestAcceptedEvent, networkId);
+                this._broadcastCallback(fillRequestAcceptedEvent, chainId);
                 return;
             }
 
@@ -349,7 +337,7 @@ export class Handlers {
                 const response = await this._handleCancelsAsync(
                     coordinatorOrders,
                     signedTransaction,
-                    networkId,
+                    chainId,
                     txOrigin,
                 );
                 res.status(response.status).send(response.body);
@@ -372,14 +360,12 @@ export class Handlers {
     private async _getTakerAssetFillAmountsFromDecodedCalldataAsync(
         decodedCalldata: DecodedCalldata,
         takerAddress: string,
-        networkId: number,
+        chainId: number,
     ): Promise<BigNumber[]> {
-        const contractAddresses = getContractAddressesForNetworkOrThrow(networkId);
         let takerAssetFillAmounts: BigNumber[] = [];
         switch (decodedCalldata.functionName) {
             case ExchangeMethods.FillOrder:
             case ExchangeMethods.FillOrKillOrder:
-            case ExchangeMethods.FillOrderNoThrow:
                 takerAssetFillAmounts.push(decodedCalldata.functionArguments.takerAssetFillAmount);
                 break;
 
@@ -389,93 +375,23 @@ export class Handlers {
                 takerAssetFillAmounts = decodedCalldata.functionArguments.takerAssetFillAmounts;
                 break;
 
-            case ExchangeMethods.MarketSellOrders:
+            case ExchangeMethods.MarketSellOrdersFillOrKill:
             case ExchangeMethods.MarketSellOrdersNoThrow: {
-                const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
-                    decodedCalldata.functionArguments.orders,
-                    decodedCalldata.functionArguments.signatures,
-                    contractAddresses.exchange,
+                takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketSellOrdersAsync(
+                    decodedCalldata,
+                    takerAddress,
+                    chainId,
                 );
-                const takerAddresses: string[] = [];
-                _.times(signedOrders.length, () => {
-                    takerAddresses.push(takerAddress);
-                });
-                const contractWrappers = this._networkIdToContractWrappers[networkId];
-                const [
-                    orderInfos,
-                    traderInfos,
-                ] = await contractWrappers.orderValidator.getOrdersAndTradersInfo.callAsync(
-                    signedOrders,
-                    takerAddresses,
-                );
-                const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
-                    orderInfo,
-                    traderInfo: traderInfos[index],
-                }));
-                let totalTakerAssetAmount: BigNumber = decodedCalldata.functionArguments.takerAssetFillAmount;
-                _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
-                    const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
-                        signedOrders[i],
-                        orderAndTraderInfo,
-                    );
-                    const takerAssetFillAmount = totalTakerAssetAmount.isLessThan(remainingFillableTakerAssetAmount)
-                        ? totalTakerAssetAmount
-                        : remainingFillableTakerAssetAmount;
-                    totalTakerAssetAmount = totalTakerAssetAmount.minus(takerAssetFillAmount);
-                    takerAssetFillAmounts.push(takerAssetFillAmount);
-                });
                 break;
             }
 
-            case ExchangeMethods.MarketBuyOrders:
+            case ExchangeMethods.MarketBuyOrdersFillOrKill:
             case ExchangeMethods.MarketBuyOrdersNoThrow: {
-                const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
-                    decodedCalldata.functionArguments.orders,
-                    decodedCalldata.functionArguments.signatures,
-                    contractAddresses.exchange,
+                takerAssetFillAmounts = await this._extractTakerAssetFillAmountsFromMarketBuyOrdersAsync(
+                    decodedCalldata,
+                    takerAddress,
+                    chainId,
                 );
-                const takerAddresses: string[] = [];
-                _.times(signedOrders.length, () => {
-                    takerAddresses.push(takerAddress);
-                });
-                const contractWrappers = this._networkIdToContractWrappers[networkId];
-                const [
-                    orderInfos,
-                    traderInfos,
-                ] = await contractWrappers.orderValidator.getOrdersAndTradersInfo.callAsync(
-                    signedOrders,
-                    takerAddresses,
-                );
-                const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
-                    orderInfo,
-                    traderInfo: traderInfos[index],
-                }));
-                let totalMakerAssetAmount: BigNumber = decodedCalldata.functionArguments.makerAssetFillAmount;
-                _.each(orderAndTraderInfos, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
-                    const signedOrder = signedOrders[i];
-                    const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
-                        signedOrder,
-                        orderAndTraderInfo,
-                    );
-                    const totalTakerAssetAmountAtOrderExchangeRate = orderCalculationUtils.getTakerFillAmount(
-                        signedOrder,
-                        totalMakerAssetAmount,
-                    );
-                    const takerAssetFillAmount = totalTakerAssetAmountAtOrderExchangeRate.isLessThan(
-                        remainingFillableTakerAssetAmount,
-                    )
-                        ? totalTakerAssetAmountAtOrderExchangeRate
-                        : remainingFillableTakerAssetAmount;
-
-                    const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(
-                        takerAssetFillAmount,
-                    );
-                    totalMakerAssetAmount = orderCalculationUtils.getMakerFillAmount(
-                        signedOrder,
-                        remainingTotalTakerAssetAmount,
-                    );
-                    takerAssetFillAmounts.push(takerAssetFillAmount);
-                });
                 break;
             }
 
@@ -484,10 +400,130 @@ export class Handlers {
         }
         return takerAssetFillAmounts;
     }
+    private async _extractTakerAssetFillAmountsFromMarketSellOrdersAsync(
+        decodedCalldata: DecodedCalldata,
+        takerAddress: string,
+        chainId: number,
+    ): Promise<BigNumber[]> {
+        const takerAssetFillAmounts: BigNumber[] = [];
+        const contractAddresses = getContractAddressesForChainOrThrow(chainId);
+        const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
+            decodedCalldata.functionArguments.orders,
+            decodedCalldata.functionArguments.signatures,
+            contractAddresses.exchange,
+        );
+        const batchOrderAndTraderInfo = await this._getBatchOrderAndTraderInfoAsync(
+            signedOrders,
+            takerAddress,
+            chainId,
+        );
+        let totalTakerAssetAmount: BigNumber = decodedCalldata.functionArguments.takerAssetFillAmount;
+        _.each(batchOrderAndTraderInfo, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
+            const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
+                signedOrders[i],
+                orderAndTraderInfo,
+            );
+            const takerAssetFillAmount = totalTakerAssetAmount.isLessThan(remainingFillableTakerAssetAmount)
+                ? totalTakerAssetAmount
+                : remainingFillableTakerAssetAmount;
+            totalTakerAssetAmount = totalTakerAssetAmount.minus(takerAssetFillAmount);
+            takerAssetFillAmounts.push(takerAssetFillAmount);
+        });
+
+        return takerAssetFillAmounts;
+    }
+    private async _extractTakerAssetFillAmountsFromMarketBuyOrdersAsync(
+        decodedCalldata: DecodedCalldata,
+        takerAddress: string,
+        chainId: number,
+    ): Promise<BigNumber[]> {
+        const takerAssetFillAmounts: BigNumber[] = [];
+        const contractAddresses = getContractAddressesForChainOrThrow(chainId);
+        const signedOrders = utils.getSignedOrdersFromOrderWithoutExchangeAddresses(
+            decodedCalldata.functionArguments.orders,
+            decodedCalldata.functionArguments.signatures,
+            contractAddresses.exchange,
+        );
+        const batchOrderAndTraderInfo = await this._getBatchOrderAndTraderInfoAsync(
+            signedOrders,
+            takerAddress,
+            chainId,
+        );
+        let totalMakerAssetAmount: BigNumber = decodedCalldata.functionArguments.makerAssetFillAmount;
+        _.each(batchOrderAndTraderInfo, (orderAndTraderInfo: OrderAndTraderInfo, i: number) => {
+            const signedOrder = signedOrders[i];
+            const remainingFillableTakerAssetAmount = Handlers._calculateRemainingFillableTakerAssetAmount(
+                signedOrder,
+                orderAndTraderInfo,
+            );
+            const totalTakerAssetAmountAtOrderExchangeRate = orderCalculationUtils.getTakerFillAmount(
+                signedOrder,
+                totalMakerAssetAmount,
+            );
+            const takerAssetFillAmount = totalTakerAssetAmountAtOrderExchangeRate.isLessThan(
+                remainingFillableTakerAssetAmount,
+            )
+                ? totalTakerAssetAmountAtOrderExchangeRate
+                : remainingFillableTakerAssetAmount;
+
+            const remainingTotalTakerAssetAmount = totalTakerAssetAmountAtOrderExchangeRate.minus(takerAssetFillAmount);
+            totalMakerAssetAmount = orderCalculationUtils.getMakerFillAmount(
+                signedOrder,
+                remainingTotalTakerAssetAmount,
+            );
+            takerAssetFillAmounts.push(takerAssetFillAmount);
+        });
+
+        return takerAssetFillAmounts;
+    }
+    private async _getBatchOrderAndTraderInfoAsync(
+        signedOrders: SignedOrder[],
+        takerAddress: string,
+        chainId: number,
+    ): Promise<OrderAndTraderInfo[]> {
+        const contractWrappers = this._chainIdToContractWrappers[chainId];
+        const signatures = _.map(signedOrders, 'signature');
+        const [orderInfos] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(signedOrders, signatures);
+        const traderInfos: TraderInfo[] = [];
+        for (const signedOrder of signedOrders) {
+            const [makerBalancesAndAllowances, takerBalancesAndAllowances] = await Promise.all([
+                // Maker balances and allowances
+                contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(signedOrder.makerAddress, [
+                    signedOrder.makerAssetData,
+                    signedOrder.makerFeeAssetData,
+                ]),
+
+                // Taker balances and allowances
+                contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(takerAddress, [
+                    signedOrder.takerAssetData,
+                    signedOrder.takerFeeAssetData,
+                ]),
+            ]);
+
+            traderInfos.push({
+                // Maker
+                makerBalance: makerBalancesAndAllowances[0][0],
+                makerAllowance: makerBalancesAndAllowances[0][1],
+                makerFeeBalance: makerBalancesAndAllowances[1][0],
+                makerFeeAllowance: makerBalancesAndAllowances[1][1],
+
+                // Taker
+                takerBalance: takerBalancesAndAllowances[0][0],
+                takerAllowance: takerBalancesAndAllowances[0][1],
+                takerFeeBalance: takerBalancesAndAllowances[1][0],
+                takerFeeAllowance: takerBalancesAndAllowances[1][1],
+            });
+        }
+        const orderAndTraderInfos = orderInfos.map((orderInfo, index) => ({
+            orderInfo,
+            traderInfo: traderInfos[index],
+        }));
+        return orderAndTraderInfos;
+    }
     private async _handleCancelsAsync(
         coordinatorOrders: Order[],
         signedTransaction: SignedZeroExTransaction,
-        networkId: number,
+        chainId: number,
         txOrigin: string,
     ): Promise<Response> {
         for (const order of coordinatorOrders) {
@@ -513,7 +549,7 @@ export class Handlers {
                 transaction: unsignedTransaction,
             },
         };
-        this._broadcastCallback(cancelRequestAccepted, networkId);
+        this._broadcastCallback(cancelRequestAccepted, chainId);
         const outstandingFillSignatures = await transactionModel.getOutstandingFillSignaturessByOrdersAsync(
             coordinatorOrders,
         );
@@ -525,7 +561,7 @@ export class Handlers {
             txOrigin,
             signedTransaction,
             coordinatorOrders,
-            networkId,
+            chainId,
             ZERO,
         );
 
@@ -542,7 +578,7 @@ export class Handlers {
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         takerAssetFillAmounts: BigNumber[],
-        networkId: number,
+        chainId: number,
     ): Promise<Response> {
         await Handlers._validateFillsAllowedOrThrowAsync(signedTransaction, coordinatorOrders, takerAssetFillAmounts);
 
@@ -553,7 +589,7 @@ export class Handlers {
                 transactionHash,
             },
         };
-        this._broadcastCallback(fillRequestReceivedEvent, networkId);
+        this._broadcastCallback(fillRequestReceivedEvent, chainId);
         await utils.sleepAsync(this._configs.SELECTIVE_DELAY_MS); // Await selective delay
 
         // Check that still a valid fill request after selective delay
@@ -565,17 +601,27 @@ export class Handlers {
             );
         }
 
+        // Compute approval expiration time and assert transaction expiration
         const approvalExpirationTimeSeconds =
             utils.getCurrentTimestampSeconds() + this._configs.EXPIRATION_DURATION_SECONDS;
+        if (signedTransaction.expirationTimeSeconds.gt(approvalExpirationTimeSeconds)) {
+            throw new ValidationError([
+                {
+                    field: 'signedTransaction.expirationTimeSeconds',
+                    code: ValidationErrorCodes.TransactionExpirationTooHigh,
+                    reason: `Expiration cannot exceeed ${this._configs.EXPIRATION_DURATION_SECONDS} seconds after approval by the coordinator server (expected value to be less or equal to ${approvalExpirationTimeSeconds}})`,
+                },
+            ]);
+        }
+
+        // Generate response and record in DB
         const response = await this._generateApprovalSignatureAsync(
             txOrigin,
             signedTransaction,
             coordinatorOrders,
-            networkId,
+            chainId,
             approvalExpirationTimeSeconds,
         );
-
-        // Insert signature into DB
         await transactionModel.createAsync(
             transactionHash,
             txOrigin,
@@ -595,15 +641,14 @@ export class Handlers {
         txOrigin: string,
         signedTransaction: SignedZeroExTransaction,
         coordinatorOrders: Order[],
-        networkId: number,
+        chainId: number,
         approvalExpirationTimeSeconds: number,
     ): Promise<RequestTransactionResponse> {
-        const contractWrappers = this._networkIdToContractWrappers[networkId];
+        const contractWrappers = this._chainIdToContractWrappers[chainId];
         const typedData = eip712Utils.createCoordinatorApprovalTypedData(
             signedTransaction,
             contractWrappers.coordinator.address,
             txOrigin,
-            new BigNumber(approvalExpirationTimeSeconds),
         );
         const approvalHashBuff = signTypedDataUtils.generateTypedDataHash(typedData);
 
@@ -620,7 +665,7 @@ export class Handlers {
         const feeRecipientAddressesUsed = Array.from(feeRecipientAddressSet);
         for (const feeRecipientAddress of feeRecipientAddressesUsed) {
             const feeRecipientIfExists = _.find(
-                this._configs.NETWORK_ID_TO_SETTINGS[networkId].FEE_RECIPIENTS,
+                this._configs.CHAIN_ID_TO_SETTINGS[chainId].FEE_RECIPIENTS,
                 f => f.ADDRESS === feeRecipientAddress,
             );
             if (feeRecipientIfExists === undefined) {

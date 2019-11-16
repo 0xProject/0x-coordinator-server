@@ -8,30 +8,30 @@ import { ValidationError, ValidationErrorCodes } from '../errors';
  * Parses URL params and stores them on the request object
  */
 export function urlParamsParsing(
-    supportedNetworkIds: number[],
+    supportedChainIds: number[],
     req: express.Request,
     _res: express.Response,
     next: express.NextFunction,
 ): void {
-    const networkId = parseNetworkId(supportedNetworkIds, req.query.networkId);
+    const chainId = parseChainId(supportedChainIds, req.query.chainId);
     // HACK(leo): This is the recommended way to pass data from middlewares on. It's not beautiful nor fully type-safe.
-    req.networkId = networkId;
+    req.chainId = chainId;
     next();
 }
 
-function parseNetworkId(supportedNetworkIds: number[], networkIdStrIfExists?: string): number {
-    if (_.isUndefined(networkIdStrIfExists)) {
-        return constants.DEFAULT_NETWORK_ID;
+function parseChainId(supportedChainIds: number[], chainIdStrIfExists?: string): number {
+    if (chainIdStrIfExists === undefined) {
+        return constants.DEFAULT_CHAIN_ID;
     } else {
-        const networkId = _.parseInt(networkIdStrIfExists);
-        if (!_.includes(supportedNetworkIds, networkId)) {
+        const chainId = _.parseInt(chainIdStrIfExists);
+        if (!_.includes(supportedChainIds, chainId)) {
             const validationErrorItem = {
-                field: 'networkId',
+                field: 'chainId',
                 code: ValidationErrorCodes.UnsupportedOption,
-                reason: 'Requested networkId not supported by this coordinator',
+                reason: 'Requested chainId not supported by this coordinator',
             };
             throw new ValidationError([validationErrorItem]);
         }
-        return networkId;
+        return chainId;
     }
 }

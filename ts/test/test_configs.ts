@@ -4,8 +4,8 @@ export const configs = {
     // Network port to listen on
     HTTP_PORT: 3000,
     // The fee recipient details used by the coordinator's relayer for a particular network
-    NETWORK_ID_TO_SETTINGS: {
-        50: {
+    CHAIN_ID_TO_SETTINGS: {
+        1337: {
             FEE_RECIPIENTS: [
                 {
                     ADDRESS: FEE_RECIPIENT_ADDRESS_ONE,

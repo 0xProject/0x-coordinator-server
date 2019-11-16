@@ -6,8 +6,8 @@ import * as WebSocket from 'websocket';
 
 export interface Configs {
     HTTP_PORT: number;
-    NETWORK_ID_TO_SETTINGS: NetworkIdToNetworkSpecificSettings;
-    NETWORK_ID_TO_CONTRACT_ADDRESSES?: NetworkIdToContractAddresses;
+    CHAIN_ID_TO_SETTINGS: ChainIdToNetworkSpecificSettings;
+    CHAIN_ID_TO_CONTRACT_ADDRESSES?: ChainIdToContractAddresses;
     SELECTIVE_DELAY_MS: number;
     EXPIRATION_DURATION_SECONDS: number;
 }
@@ -68,7 +68,7 @@ export interface OrderHashToFillAmount {
 
 export type BroadcastMessage = FillRequestReceivedEvent | FillRequestAcceptedEvent | CancelRequestAccepted;
 
-export type BroadcastCallback = (message: BroadcastMessage, networkId: number) => void;
+export type BroadcastCallback = (message: BroadcastMessage, chainId: number) => void;
 
 export interface OutstandingFillSignatures {
     approvalSignatures: string[];
@@ -87,21 +87,58 @@ export interface NetworkSpecificSettings {
     RPC_URL: string;
 }
 
-export interface NetworkIdToContractAddresses {
-    [networkId: number]: ContractAddresses;
+export interface ChainIdToContractAddresses {
+    [chainId: number]: ContractAddresses;
 }
-export interface NetworkIdToNetworkSpecificSettings {
-    [networkId: number]: NetworkSpecificSettings;
-}
-
-export interface NetworkIdToProvider {
-    [networkId: number]: Web3ProviderEngine;
+export interface ChainIdToNetworkSpecificSettings {
+    [chainId: number]: NetworkSpecificSettings;
 }
 
-export interface NetworkIdToContractWrappers {
-    [networkId: number]: ContractWrappers;
+export interface ChainIdToProvider {
+    [chainId: number]: Web3ProviderEngine;
 }
 
-export interface NetworkIdToConnectionStore {
-    [networkId: number]: Set<WebSocket.connection>;
+export interface ChainIdToContractWrappers {
+    [chainId: number]: ContractWrappers;
+}
+
+export interface ChainIdToConnectionStore {
+    [chainId: number]: Set<WebSocket.connection>;
+}
+
+export interface OrderInfo {
+    orderStatus: number;
+    orderHash: string;
+    orderTakerAssetFilledAmount: BigNumber;
+}
+
+export interface TraderInfo {
+    makerBalance: BigNumber;
+    makerAllowance: BigNumber;
+    takerBalance: BigNumber;
+    takerAllowance: BigNumber;
+    makerFeeBalance: BigNumber;
+    makerFeeAllowance: BigNumber;
+    takerFeeBalance: BigNumber;
+    takerFeeAllowance: BigNumber;
+}
+
+export interface OrderAndTraderInfo {
+    orderInfo: OrderInfo;
+    traderInfo: TraderInfo;
+}
+
+export enum ExchangeMethods {
+    FillOrder = 'fillOrder',
+    FillOrKillOrder = 'fillOrKillOrder',
+    BatchFillOrders = 'batchFillOrders',
+    BatchFillOrKillOrders = 'batchFillOrKillOrders',
+    BatchFillOrdersNoThrow = 'batchFillOrdersNoThrow',
+    MarketSellOrdersFillOrKill = 'marketSellOrdersFillOrKill',
+    MarketSellOrdersNoThrow = 'marketSellOrdersNoThrow',
+    MarketBuyOrdersFillOrKill = 'marketBuyOrdersFillOrKill',
+    MarketBuyOrdersNoThrow = 'marketBuyOrdersNoThrow',
+
+    CancelOrder = 'cancelOrder',
+    BatchCancelOrders = 'batchCancelOrders',
 }

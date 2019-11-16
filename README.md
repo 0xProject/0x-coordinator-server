@@ -36,7 +36,7 @@ To develop ontop of `0x-coordinator-server`, follow the following instructions:
 
 5. Edit the `src/production_configs.ts` file to work with your relayer:
 
--   `FEE_RECIPIENTS` - Should include the addresses and private keys of the `feeRecipientAddress`'s you enforce for your orders (per networkId). Your coordinator's signatures will be generated using these private keys.
+-   `FEE_RECIPIENTS` - Should include the addresses and private keys of the `feeRecipientAddress`'s you enforce for your orders (per chainId). Your coordinator's signatures will be generated using these private keys.
 -   `SELECTIVE_DELAY_MS` - An optional selective delay between fill request receipt and approval. Adding a delay here can help market makers cancel orders without competing on speed with arbitrageurs.
 -   `EXPIRATION_DURATION_SECONDS` - How long an issued signature should be valid for. This value should be long enough for someone to concievably fill an order, but short enough where off-chain cancellations take effect after some reasonable upper-bound.
 -   `RPC_URL` - The backing Ethereum node to use for JSON RPC queries. Please add your **own** Infura API key if using Infura.

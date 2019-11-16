@@ -15,17 +15,17 @@ import { GeneralErrorCodes, ValidationErrorCodes } from './errors';
 import { Handlers } from './handlers';
 import { errorHandler } from './middleware/error_handling';
 import { urlParamsParsing } from './middleware/url_params_parsing';
-import { BroadcastMessage, Configs, NetworkIdToConnectionStore, NetworkIdToProvider } from './types';
+import { BroadcastMessage, ChainIdToConnectionStore, ChainIdToProvider, Configs } from './types';
 import { utils } from './utils';
 
-const networkIdToConnectionStore: NetworkIdToConnectionStore = {};
+const chainIdToConnectionStore: ChainIdToConnectionStore = {};
 
 /**
  * Creates a new express app/server
  * @param provider Ethereum JSON RPC client for interfacing with Ethereum and signing coordinator approvals
  */
 export async function getAppAsync(
-    networkIdToProvider: NetworkIdToProvider,
+    chainIdToProvider: ChainIdToProvider,
     configs: Configs,
     dbConfigs?: ConnectionOptions,
 ): Promise<http.Server> {
@@ -34,24 +34,24 @@ export async function getAppAsync(
         await initDBConnectionAsync(dbConfigs);
     }
 
-    const handlers = new Handlers(networkIdToProvider, configs, broadcastCallback);
+    const handlers = new Handlers(chainIdToProvider, configs, broadcastCallback);
     const app = express();
     app.use(cors());
     app.use(bodyParser.json());
-    const supportedNetworkIds = utils.getSupportedNetworkIds(configs);
-    app.use(urlParamsParsing.bind(undefined, supportedNetworkIds));
+    const supportedChainIds = utils.getSupportedChainIds(configs);
+    app.use(urlParamsParsing.bind(undefined, supportedChainIds));
 
-    app.get('/v1/ping', (_, res) => res.send('pong')); // tslint:disable-line:no-shadowed-variable
+    app.get('/v2/ping', (_, res) => res.send('pong')); // tslint:disable-line:no-shadowed-variable
 
     /**
      * GET endpoint for requesting current coordination server configuration
      */
-    app.get('/v1/configuration', ({}, response: express.Response) => {
+    app.get('/v2/configuration', ({}, response: express.Response) => {
         response
             .send({
                 expirationDurationSeconds: configs.EXPIRATION_DURATION_SECONDS,
                 selectiveDelayMs: configs.SELECTIVE_DELAY_MS,
-                supportedNetworkIds,
+                supportedChainIds,
             })
             .end();
     });
@@ -59,12 +59,12 @@ export async function getAppAsync(
     /**
      * POST endpoint for requesting signatures for a 0x transaction
      */
-    app.post('/v1/request_transaction', asyncHandler(handlers.postRequestTransactionAsync.bind(handlers)));
+    app.post('/v2/request_transaction', asyncHandler(handlers.postRequestTransactionAsync.bind(handlers)));
 
     /**
      * POST endpoint for checking whether order hashes have been soft-cancelled or not
      */
-    app.post('/v1/soft_cancels', asyncHandler(handlers.postSoftCancelsAsync.bind(handlers)));
+    app.post('/v2/soft_cancels', asyncHandler(handlers.postSoftCancelsAsync.bind(handlers)));
 
     app.use(errorHandler);
 
@@ -88,21 +88,21 @@ export async function getAppAsync(
      */
     wss.on('request', async (request: any) => {
         // If the request isn't to the expected endpoint, reject
-        if (!_.includes(request.resourceURL.path, '/v1/requests')) {
+        if (!_.includes(request.resourceURL.path, '/v2/requests')) {
             request.reject(HttpStatus.NOT_FOUND, 'NOT_FOUND');
             return;
         }
-        const networkIdStr = request.resourceURL.query.networkId || constants.DEFAULT_NETWORK_ID.toString();
-        const networkId = _.parseInt(networkIdStr);
-        if (!_.includes(supportedNetworkIds, networkId)) {
+        const chainIdStr = request.resourceURL.query.chainId || constants.DEFAULT_CHAIN_ID.toString();
+        const chainId = _.parseInt(chainIdStr);
+        if (!_.includes(supportedChainIds, chainId)) {
             const body = {
                 code: GeneralErrorCodes.ValidationError,
                 reason: 'Validation Failed',
                 validationErrors: [
                     {
-                        field: 'networkId',
+                        field: 'chainId',
                         code: ValidationErrorCodes.UnsupportedOption,
-                        reason: 'Requested networkId not supported by this coordinator',
+                        reason: 'Requested chainId not supported by this coordinator',
                     },
                 ],
             };
@@ -115,10 +115,10 @@ export async function getAppAsync(
         const connection: WebSocket.connection = request.accept(null, request.origin);
 
         // Note: We don't handle the `message` event because this is a broadcast-only endpoint
-        const connectionStoreIfExists = networkIdToConnectionStore[networkId];
+        const connectionStoreIfExists = chainIdToConnectionStore[chainId];
         if (connectionStoreIfExists === undefined) {
             // This error should never be hit
-            throw new Error(`Attempted to broadcast to unsupported networkId: ${networkId}`);
+            throw new Error(`Attempted to broadcast to unsupported chainId: ${chainId}`);
         }
         connectionStoreIfExists.add(connection);
         connection.on('close', () => {
@@ -126,19 +126,19 @@ export async function getAppAsync(
         });
     });
 
-    // Initialize the connectionStore mapping for supported networkIds
-    supportedNetworkIds.forEach(networkId => {
-        networkIdToConnectionStore[networkId] = new Set<WebSocket.connection>();
+    // Initialize the connectionStore mapping for supported chainIds
+    supportedChainIds.forEach(chainId => {
+        chainIdToConnectionStore[chainId] = new Set<WebSocket.connection>();
     });
 
     return server;
 }
 
-function broadcastCallback(event: BroadcastMessage, networkId: number): void {
-    const connectionStoreIfExists = networkIdToConnectionStore[networkId];
+function broadcastCallback(event: BroadcastMessage, chainId: number): void {
+    const connectionStoreIfExists = chainIdToConnectionStore[chainId];
     if (connectionStoreIfExists === undefined) {
         // This error should never be hit
-        throw new Error(`Attempted to broadcast to unsupported networkId: ${networkId}`);
+        throw new Error(`Attempted to broadcast to unsupported chainId: ${chainId}`);
     }
     connectionStoreIfExists.forEach((connection: WebSocket.connection) => {
         connection.sendUTF(JSON.stringify(event));

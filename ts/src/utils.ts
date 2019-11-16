@@ -1,5 +1,5 @@
 import { Schema, SchemaValidator } from '@0x/json-schemas';
-import { OrderWithoutExchangeAddress, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
+import { Order, SignedOrder, SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import * as ethUtil from 'ethereumjs-util';
 import { ValidationError as SchemaValidationError } from 'jsonschema';
 import * as _ from 'lodash';
@@ -41,11 +41,9 @@ export const utils = {
         const address = ethUtil.addHexPrefix(addressBuf.toString('hex'));
         return address;
     },
-    getSupportedNetworkIds(configs: Configs): number[] {
-        const supportedNetworkIds = _.map(_.keys(configs.NETWORK_ID_TO_SETTINGS), networkIdStr =>
-            _.parseInt(networkIdStr),
-        );
-        return supportedNetworkIds;
+    getSupportedChainIds(configs: Configs): number[] {
+        const supportedChainIds = _.map(_.keys(configs.CHAIN_ID_TO_SETTINGS), chainIdStr => _.parseInt(chainIdStr));
+        return supportedChainIds;
     },
     getCurrentTimestampSeconds(): number {
         return Math.round(Date.now() / 1000);
@@ -53,7 +51,7 @@ export const utils = {
     async sleepAsync(miliseconds: number): Promise<void> {
         await new Promise<void>(resolve => setTimeout(resolve, miliseconds));
     },
-    convertToUnsignedOrder(order: SignedOrder): OrderWithoutExchangeAddress {
+    convertToUnsignedOrder(order: SignedOrder): Order {
         const orderWithoutExchangeAddress = {
             ...order,
         };
@@ -61,7 +59,7 @@ export const utils = {
         return orderWithoutExchangeAddress;
     },
     getSignedOrdersFromOrderWithoutExchangeAddresses(
-        orders: OrderWithoutExchangeAddress[],
+        orders: Order[],
         signatures: string[],
         exchangeAddress: string,
     ): SignedOrder[] {
