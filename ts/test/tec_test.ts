@@ -651,6 +651,61 @@ describe('Coordinator server', () => {
                     { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                 );
         });
+        it('should return 200 OK if request to marketSellOrdersFillOrKill uncancelled orders', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync();
+            const orderTwo = await orderFactory.newSignedOrderAsync();
+            // 1.5X the total fillAmount of the two orders
+            const orderOneTakerAssetFillAmount = orderOne.takerAssetAmount;
+            const orderTwoTakerAssetFillAmount = orderTwo.takerAssetAmount.div(2);
+            const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
+            const data = contractWrappers.exchange
+                .marketSellOrdersFillOrKill([orderOne, orderTwo], takerAssetFillAmount, [
+                    orderOne.signature,
+                    orderTwo.signature,
+                ])
+                .getABIEncodedTransactionData();
+            const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
+            const body = {
+                signedTransaction,
+                txOrigin: takerAddress,
+            };
+            const response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status, 'response status').to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures, 'response signatures').to.not.be.undefined();
+            expect(response.body.signatures.length, 'response signatures length').to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds, 'response expiration time in seconds').to.be.greaterThan(
+                currTimestamp,
+            );
+
+            // Check that fill request was added to DB
+            const transactionEntityIfExists = await transactionModel.findAsync(
+                takerAddress,
+                JSON.stringify(response.body.signatures),
+            );
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
+                response.body.expirationTimeSeconds,
+            );
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
+
+            // Check that the correct takerAssetFillAmounts were calculated and stored
+            const orderHashOne = orderHashUtils.getOrderHashHex(orderOne);
+            const takerAssetFillAmountOne = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashOne,
+            ) as TakerAssetFillAmountEntity;
+            expect(takerAssetFillAmountOne.takerAssetFillAmount).to.be.bignumber.equal(orderOneTakerAssetFillAmount);
+
+            const orderHashTwo = orderHashUtils.getOrderHashHex(orderTwo);
+            const takerAssetFillAmountTwo = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashTwo,
+            ) as TakerAssetFillAmountEntity;
+            expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
+        });
         it('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
@@ -715,6 +770,67 @@ describe('Coordinator server', () => {
             const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
             const data = contractWrappers.exchange
                 .marketBuyOrdersNoThrow([orderOne, orderTwo], makerAssetFillAmount, [
+                    orderOne.signature,
+                    orderTwo.signature,
+                ])
+                .getABIEncodedTransactionData();
+            const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
+            const body = {
+                signedTransaction,
+                txOrigin: takerAddress,
+            };
+            const response = await request(app)
+                .post(HTTP_REQUEST_TRANSACTION_ENDPOINT_PATH)
+                .send(body);
+            expect(response.status).to.be.equal(HttpStatus.OK);
+            expect(response.body.signatures).to.not.be.undefined();
+            expect(response.body.signatures.length).to.be.equal(1);
+            const currTimestamp = utils.getCurrentTimestampSeconds();
+            expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
+
+            // Check that fill request was added to DB
+            const transactionEntityIfExists = await transactionModel.findAsync(
+                takerAddress,
+                JSON.stringify(response.body.signatures),
+            );
+            expect(transactionEntityIfExists).to.not.be.undefined();
+            expect((transactionEntityIfExists as TransactionEntity).expirationTimeSeconds).to.be.equal(
+                response.body.expirationTimeSeconds,
+            );
+            expect((transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts.length).to.equal(2);
+
+            // Check that the correct takerAssetFillAmounts were calculated and stored
+            const orderHashOne = orderHashUtils.getOrderHashHex(orderOne);
+            const takerAssetFillAmountOne = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashOne,
+            ) as TakerAssetFillAmountEntity;
+            const expectedOrderOneMakerAssetFillAmount = orderCalculationUtils.getMakerFillAmount(
+                orderOne,
+                takerAssetFillAmountOne.takerAssetFillAmount,
+            );
+            expect(expectedOrderOneMakerAssetFillAmount).to.be.bignumber.equal(orderOneMakerAssetFillAmount);
+
+            const orderHashTwo = orderHashUtils.getOrderHashHex(orderTwo);
+            const takerAssetFillAmountTwo = _.find(
+                (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts,
+                t => t.orderHash === orderHashTwo,
+            ) as TakerAssetFillAmountEntity;
+            const expectedOrderTwoMakerAssetFillAmount = orderCalculationUtils.getMakerFillAmount(
+                orderOne,
+                takerAssetFillAmountTwo.takerAssetFillAmount,
+            );
+            expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
+        });
+        it('should return 200 OK if request to marketBuyFillOrKill uncancelled orders', async () => {
+            const orderOne = await orderFactory.newSignedOrderAsync();
+            const orderTwo = await orderFactory.newSignedOrderAsync();
+            // 1.5X the total fillAmount of the two orders
+            const orderOneMakerAssetFillAmount = orderOne.makerAssetAmount;
+            const orderTwoMakerAssetFillAmount = orderTwo.makerAssetAmount.div(2);
+            const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
+            const data = contractWrappers.exchange
+                .marketBuyOrdersFillOrKill([orderOne, orderTwo], makerAssetFillAmount, [
                     orderOne.signature,
                     orderTwo.signature,
                 ])
