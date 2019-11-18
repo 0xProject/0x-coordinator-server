@@ -1,4 +1,4 @@
-import { orderHashUtils } from '@0x/order-utils';
+import { orderHashUtils } from '@0x/contracts-test-utils';
 import { Order } from '@0x/types';
 import * as _ from 'lodash';
 

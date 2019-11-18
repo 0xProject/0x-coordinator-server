@@ -1,12 +1,7 @@
 import { getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
 import { ContractWrappers } from '@0x/contract-wrappers';
-import {
-    eip712Utils,
-    orderCalculationUtils,
-    orderHashUtils,
-    signatureUtils,
-    transactionHashUtils,
-} from '@0x/order-utils';
+import { orderHashUtils, transactionHashUtils } from '@0x/contracts-test-utils';
+import { eip712Utils, orderCalculationUtils } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, SignatureType, SignedOrder, SignedZeroExTransaction } from '@0x/types';
 import { BigNumber, DecodedCalldata, signTypedDataUtils } from '@0x/utils';
@@ -37,7 +32,6 @@ import { utils } from './utils';
 const NULL_ADDRESS = '0x0000000000000000000000000000000000000000';
 
 export class Handlers {
-    private readonly _chainIdToProvider: ChainIdToProvider;
     private readonly _broadcastCallback: BroadcastCallback;
     private readonly _chainIdToContractWrappers: ChainIdToContractWrappers;
     private readonly _configs: Configs;
@@ -192,7 +186,6 @@ export class Handlers {
         }
     }
     constructor(chainIdToProvider: ChainIdToProvider, configs: Configs, broadcastCallback: BroadcastCallback) {
-        this._chainIdToProvider = chainIdToProvider;
         this._broadcastCallback = broadcastCallback;
         this._configs = configs;
         this._chainIdToContractWrappers = {};
@@ -274,13 +267,9 @@ export class Handlers {
         }
 
         // 5. Validate the 0x transaction signature
-        const provider = this._chainIdToProvider[chainId];
-        const isValidSignature = await signatureUtils.isValidSignatureAsync(
-            provider,
-            transactionHash,
-            signedTransaction.signature,
-            signedTransaction.signerAddress,
-        );
+        const isValidSignature = await this._chainIdToContractWrappers[chainId].exchange
+            .isValidHashSignature(transactionHash, signedTransaction.signerAddress, signedTransaction.signature)
+            .callAsync();
         if (!isValidSignature) {
             throw new ValidationError([
                 {
@@ -483,21 +472,27 @@ export class Handlers {
     ): Promise<OrderAndTraderInfo[]> {
         const contractWrappers = this._chainIdToContractWrappers[chainId];
         const signatures = _.map(signedOrders, 'signature');
-        const [orderInfos] = await contractWrappers.devUtils.getOrderRelevantStates.callAsync(signedOrders, signatures);
+        const [orderInfos] = await contractWrappers.devUtils
+            .getOrderRelevantStates(signedOrders, signatures)
+            .callAsync();
         const traderInfos: TraderInfo[] = [];
         for (const signedOrder of signedOrders) {
             const [makerBalancesAndAllowances, takerBalancesAndAllowances] = await Promise.all([
                 // Maker balances and allowances
-                contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(signedOrder.makerAddress, [
-                    signedOrder.makerAssetData,
-                    signedOrder.makerFeeAssetData,
-                ]),
+                contractWrappers.devUtils
+                    .getBatchBalancesAndAssetProxyAllowances(signedOrder.makerAddress, [
+                        signedOrder.makerAssetData,
+                        signedOrder.makerFeeAssetData,
+                    ])
+                    .callAsync(),
 
                 // Taker balances and allowances
-                contractWrappers.devUtils.getBatchBalancesAndAssetProxyAllowances.callAsync(takerAddress, [
-                    signedOrder.takerAssetData,
-                    signedOrder.takerFeeAssetData,
-                ]),
+                contractWrappers.devUtils
+                    .getBatchBalancesAndAssetProxyAllowances(takerAddress, [
+                        signedOrder.takerAssetData,
+                        signedOrder.takerFeeAssetData,
+                    ])
+                    .callAsync(),
             ]);
 
             traderInfos.push({
@@ -645,7 +640,7 @@ export class Handlers {
         approvalExpirationTimeSeconds: number,
     ): Promise<RequestTransactionResponse> {
         const contractWrappers = this._chainIdToContractWrappers[chainId];
-        const typedData = eip712Utils.createCoordinatorApprovalTypedData(
+        const typedData = await eip712Utils.createCoordinatorApprovalTypedDataAsync(
             signedTransaction,
             contractWrappers.coordinator.address,
             txOrigin,
