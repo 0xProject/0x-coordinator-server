@@ -1256,11 +1256,8 @@ async function createSignedTransactionAsync(
     const privateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(signerAddress)];
     transactionFactory = new TransactionFactory(privateKey, contractAddresses.exchange, chainId);
 
-    // if not provided, set default expiration time to be 90s in the future
-    const expirationTimeSeconds =
-        transactionData.expirationTimeSeconds || new BigNumber(Math.floor(Date.now() / 1000) + 90); // tslint:disable-line:no-magic-numbers
     const txData = {
-        expirationTimeSeconds,
+        expirationTimeSeconds: new BigNumber(Math.floor(Date.now() / 1000) + configs.EXPIRATION_DURATION_SECONDS),
         ...transactionData,
     };
     const signedTransaction = transactionFactory.newSignedTransactionAsync(txData, SignatureType.EIP712);
