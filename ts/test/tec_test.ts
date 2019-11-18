@@ -15,7 +15,7 @@ import { runMigrationsOnceAsync } from '@0x/migrations';
 import { orderCalculationUtils, SignatureType } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
-import { BigNumber, fetchAsync } from '@0x/utils';
+import { BigNumber, decodeBytesAsRevertError, fetchAsync } from '@0x/utils';
 import { Web3Wrapper } from '@0x/web3-wrapper';
 import * as chai from 'chai';
 import * as chaiAsPromised from 'chai-as-promised';
@@ -552,7 +552,7 @@ describe('Coordinator server', () => {
             expect(response.body.validationErrors[0].code).to.be.equal(ValidationErrorCodes.UnsupportedOption);
             expect(response.body.validationErrors[0].field).to.be.equal('chainId');
         });
-        it('should return 200 OK if request to batchFill 2 orders each with a different, supported feeRecipientAddress', async () => {
+        it.only('should return 200 OK if request to batchFill 2 orders each with a different, supported feeRecipientAddress', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: FEE_RECIPIENT_ADDRESS_ONE,
             });
@@ -599,6 +599,23 @@ describe('Coordinator server', () => {
             expect(
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[1].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmountTwo);
+
+            const coordinatorContract = new CoordinatorContract(contractAddresses.coordinator, provider);
+            try {
+                await coordinatorContract
+                .executeTransaction(signedTransaction, txOrigin, signedTransaction.signature, response.body.signatures)
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        gasPrice: defaultTransactionParams.gasPrice,
+                        gas: testConstants.MAX_EXECUTE_TRANSACTION_GAS,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER,
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
+            } catch (e) {
+                console.log(decodeBytesAsRevertError(e.values.errorData));
+            }
         });
         it('should return 200 OK if request to fill uncancelled order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
