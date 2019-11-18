@@ -567,14 +567,18 @@ describe('Coordinator server', () => {
             );
             expect(response.body.cancellationSignatures.length).to.be.equal(1);
 
+            // Execute cancel transaction and validate order was cancelled
             expect(
                 await coordinatorContract
-                    .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                    .executeTransaction(signedCancelTransaction, makerAddress, signedCancelTransaction.signature, [])
                     .awaitTransactionSuccessAsync(
                         { from: makerAddress },
                         { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                     ),
             ).to.be.fulfilled;
+            expect(
+                await exchangeContract.cancelled(orderHashUtils.getOrderHashHex(order)).callAsync()
+            ).to.be.true();
         });
         it('should return 400 if request specifies unsupported chainId', async () => {
             const order = await orderFactory.newSignedOrderAsync();
