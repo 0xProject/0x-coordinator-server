@@ -647,7 +647,10 @@ describe('Coordinator server', () => {
             await coordinatorContract
                 .executeTransaction(signedTransaction, txOrigin, signedTransaction.signature, response.body.signatures)
                 .awaitTransactionSuccessAsync(
-                    { from: takerAddress },
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
                     { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                 );
         });
@@ -757,7 +760,10 @@ describe('Coordinator server', () => {
                     response.body.signatures,
                 )
                 .awaitTransactionSuccessAsync(
-                    { from: takerAddress },
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
                     { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                 );
         });
@@ -825,7 +831,10 @@ describe('Coordinator server', () => {
                         response.body.signatures,
                     )
                     .awaitTransactionSuccessAsync(
-                        { from: takerAddress },
+                        {
+                            from: takerAddress,
+                            value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                        },
                         { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                     ),
             ).to.be.fulfilled;
@@ -900,7 +909,10 @@ describe('Coordinator server', () => {
                         response.body.signatures,
                     )
                     .awaitTransactionSuccessAsync(
-                        { from: takerAddress },
+                        {
+                            from: takerAddress,
+                            value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                        },
                         { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                     ),
             ).to.be.fulfilled;
@@ -975,7 +987,10 @@ describe('Coordinator server', () => {
                         response.body.signatures,
                     )
                     .awaitTransactionSuccessAsync(
-                        { from: takerAddress },
+                        {
+                            from: takerAddress,
+                            value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                        },
                         { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                     ),
             ).to.be.fulfilled;
