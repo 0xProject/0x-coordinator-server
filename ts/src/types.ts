@@ -3,7 +3,6 @@ import { Web3ProviderEngine } from '@0x/subproviders';
 import { Order, ZeroExTransaction } from '@0x/types';
 import { BigNumber } from '@0x/utils';
 import * as WebSocket from 'websocket';
-
 export interface Configs {
     HTTP_PORT: number;
     CHAIN_ID_TO_SETTINGS: ChainIdToNetworkSpecificSettings;
