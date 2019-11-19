@@ -370,14 +370,13 @@ describe('Coordinator server', () => {
             isSoftCancelled = await orderModel.isSoftCancelledAsync(notCoordinatorOrder);
             expect(isSoftCancelled).to.be.false();
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
-                    .awaitTransactionSuccessAsync(
-                        { from: makerAddress },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK & mark order as cancelled if successfully batch cancelling orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -402,14 +401,13 @@ describe('Coordinator server', () => {
             isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
             expect(isSoftCancelled).to.be.true();
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
-                    .awaitTransactionSuccessAsync(
-                        { from: makerAddress },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to batchCancel 2 orders each with a different, supported feeRecipientAddress', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync({
@@ -438,14 +436,13 @@ describe('Coordinator server', () => {
             isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
             expect(isSoftCancelled).to.be.true();
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
-                    .awaitTransactionSuccessAsync(
-                        { from: makerAddress },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 400 and leave order uncancelled if non-maker tried to cancel an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -512,14 +509,13 @@ describe('Coordinator server', () => {
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(fillResponse.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
-                    .awaitTransactionSuccessAsync(
-                        { from: makerAddress },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK to order cancellation request & return outstandingFillSignatures', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -568,17 +564,16 @@ describe('Coordinator server', () => {
             expect(response.body.cancellationSignatures.length).to.be.equal(1);
 
             // Execute cancel transaction and validate order was cancelled
-            expect(
-                await coordinatorContract
-                    .executeTransaction(signedCancelTransaction, makerAddress, signedCancelTransaction.signature, [])
-                    .awaitTransactionSuccessAsync(
-                        { from: makerAddress },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
-            expect(
-                await exchangeContract.cancelled(orderHashUtils.getOrderHashHex(order)).callAsync()
-            ).to.be.true();
+            await coordinatorContract
+                .executeTransaction(signedCancelTransaction, makerAddress, signedCancelTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
+            const isCancelledOnChain = await exchangeContract
+                .cancelled(orderHashUtils.getOrderHashHex(order))
+                .callAsync();
+            expect(isCancelledOnChain).to.be.true();
         });
         it('should return 400 if request specifies unsupported chainId', async () => {
             const order = await orderFactory.newSignedOrderAsync();
@@ -648,6 +643,7 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[1].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmountTwo);
 
+            // Execute signed transaction in coordinator contract
             await coordinatorContract
                 .executeTransaction(signedTransaction, txOrigin, signedTransaction.signature, response.body.signatures)
                 .awaitTransactionSuccessAsync(
@@ -693,6 +689,7 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmount);
 
+            // Execute signed transaction in coordinator contract
             await coordinatorContract
                 .executeTransaction(signedTransaction, txOrigin, signedTransaction.signature, [
                     response.body.signatures[0],
@@ -756,6 +753,8 @@ describe('Coordinator server', () => {
                 t => t.orderHash === orderHashTwo,
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
+
+            // Execute signed transaction in coordinator contract
             await coordinatorContract
                 .executeTransaction(
                     signedTransaction,
@@ -826,22 +825,21 @@ describe('Coordinator server', () => {
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(
-                        signedTransaction,
-                        takerAddress,
-                        signedTransaction.signature,
-                        response.body.signatures,
-                    )
-                    .awaitTransactionSuccessAsync(
-                        {
-                            from: takerAddress,
-                            value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
-                        },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -904,22 +902,21 @@ describe('Coordinator server', () => {
             );
             expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(
-                        signedTransaction,
-                        takerAddress,
-                        signedTransaction.signature,
-                        response.body.signatures,
-                    )
-                    .awaitTransactionSuccessAsync(
-                        {
-                            from: takerAddress,
-                            value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
-                        },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to marketBuyFillOrKill uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -982,22 +979,21 @@ describe('Coordinator server', () => {
             );
             expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
 
-            expect(
-                await coordinatorContract
-                    .executeTransaction(
-                        signedTransaction,
-                        takerAddress,
-                        signedTransaction.signature,
-                        response.body.signatures,
-                    )
-                    .awaitTransactionSuccessAsync(
-                        {
-                            from: takerAddress,
-                            value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
-                        },
-                        { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-                    ),
-            ).to.be.fulfilled;
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 400 TRANSACTION_ALREADY_USED if request same 0x transaction multiple times', async () => {
             const order = await orderFactory.newSignedOrderAsync();
