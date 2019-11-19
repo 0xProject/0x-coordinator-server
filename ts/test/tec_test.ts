@@ -1,6 +1,5 @@
-import { CoordinatorContract, ERC20TokenContract } from '@0x/abi-gen-wrappers';
-import { ContractAddresses, getContractAddressesForChainOrThrow } from '@0x/contract-addresses';
-import { ContractWrappers } from '@0x/contract-wrappers';
+import { CoordinatorContract, ERC20TokenContract, ExchangeContract } from '@0x/abi-gen-wrappers';
+import { ContractAddresses } from '@0x/contract-addresses';
 import { IAssetDataContract } from '@0x/contracts-asset-proxy';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import {
@@ -55,7 +54,11 @@ const TESTRPC_PRIVATE_KEYS = _.map(TESTRPC_PRIVATE_KEYS_STRINGS, privateKeyStrin
 );
 const UNLIMITED_ALLOWANCE = new BigNumber(2).pow(256).minus(1);
 const DEFAULT_PROTOCOL_FEE_MULTIPLIER = new BigNumber(150000);
-
+const TX_DEFAULTS = {
+    gasPrice: new BigNumber(1),
+    gas: testConstants.MAX_EXECUTE_TRANSACTION_GAS,
+    value: DEFAULT_PROTOCOL_FEE_MULTIPLIER,
+};
 let app: http.Server;
 
 let web3Wrapper: Web3Wrapper;
@@ -71,7 +74,9 @@ let provider: Web3ProviderEngine;
 let accounts: string[];
 let contractAddresses: ContractAddresses;
 let blockchainLifecycle: BlockchainLifecycle;
-let contractWrappers: ContractWrappers;
+
+let coordinatorContract: CoordinatorContract;
+let exchangeContract: ExchangeContract;
 
 // Websocket tests only
 const TEST_PORT = 8361;
@@ -108,17 +113,15 @@ describe('Coordinator server', () => {
         await blockchainLifecycle.startAsync();
         accounts = await web3Wrapper.getAvailableAddressesAsync();
         [owner, makerAddress, takerAddress, feeRecipientAddress] = _.slice(accounts, 0, 6);
-        await runMigrationsOnceAsync(provider, { from: owner });
+        contractAddresses = await runMigrationsOnceAsync(provider, { from: owner });
 
-        contractAddresses = getContractAddressesForChainOrThrow(CHAIN_ID);
         const settings: NetworkSpecificSettings = configs.CHAIN_ID_TO_SETTINGS[CHAIN_ID];
         if (feeRecipientAddress !== settings.FEE_RECIPIENTS[0].ADDRESS) {
             throw new Error(`Expected settings.FEE_RECIPEINTS[0].ADDRESS to be ${feeRecipientAddress}`);
         }
 
-        contractWrappers = new ContractWrappers(provider, {
-            chainId: CHAIN_ID,
-        });
+        exchangeContract = new ExchangeContract(contractAddresses.exchange, provider);
+        coordinatorContract = new CoordinatorContract(contractAddresses.coordinator, provider, TX_DEFAULTS);
 
         const defaultOrderParams = {
             ...testConstants.STATIC_ORDER_PARAMS,
@@ -135,7 +138,7 @@ describe('Coordinator server', () => {
         const makerPrivateKey = TESTRPC_PRIVATE_KEYS[accounts.indexOf(makerAddress)];
         orderFactory = new OrderFactory(makerPrivateKey, defaultOrderParams);
         const testOrder = await orderFactory.newSignedOrderAsync();
-        const fillTestOrderCalldata = contractWrappers.exchange
+        const fillTestOrderCalldata = exchangeContract
             .fillOrder(testOrder, new BigNumber(5), testOrder.signature)
             .getABIEncodedTransactionData();
 
@@ -165,62 +168,62 @@ describe('Coordinator server', () => {
         const takerBalance = testConstants.STATIC_ORDER_PARAMS.takerAssetAmount.times(5);
         const takerAllowance = UNLIMITED_ALLOWANCE;
 
-        await makerTokenContract.setBalance(makerAddress, makerBalance).awaitTransactionSuccessAsync(
-            {
-                from: owner,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await makerTokenContract
+            .setBalance(makerAddress, makerBalance)
+            .awaitTransactionSuccessAsync(
+                { from: owner },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
 
-        await makerTokenContract.approve(contractAddresses.erc20Proxy, makerAllowance).awaitTransactionSuccessAsync(
-            {
-                from: makerAddress,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await makerTokenContract
+            .approve(contractAddresses.erc20Proxy, makerAllowance)
+            .awaitTransactionSuccessAsync(
+                { from: makerAddress },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
         const zrxToken = new ERC20TokenContract(contractAddresses.zrxToken, provider);
 
-        await zrxToken.transfer(makerAddress, makerBalance).awaitTransactionSuccessAsync(
-            {
-                from: owner,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await zrxToken
+            .transfer(makerAddress, makerBalance)
+            .awaitTransactionSuccessAsync(
+                { from: owner },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
 
-        await zrxToken.approve(contractAddresses.erc20Proxy, UNLIMITED_ALLOWANCE).awaitTransactionSuccessAsync(
-            {
-                from: makerAddress,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await zrxToken
+            .approve(contractAddresses.erc20Proxy, UNLIMITED_ALLOWANCE)
+            .awaitTransactionSuccessAsync(
+                { from: makerAddress },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
 
-        await takerTokenContract.setBalance(takerAddress, takerBalance).awaitTransactionSuccessAsync(
-            {
-                from: owner,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await takerTokenContract
+            .setBalance(takerAddress, takerBalance)
+            .awaitTransactionSuccessAsync(
+                { from: owner },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
 
-        await takerTokenContract.approve(contractAddresses.erc20Proxy, takerAllowance).awaitTransactionSuccessAsync(
-            {
-                from: takerAddress,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await takerTokenContract
+            .approve(contractAddresses.erc20Proxy, takerAllowance)
+            .awaitTransactionSuccessAsync(
+                { from: takerAddress },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
 
-        await zrxToken.transfer(takerAddress, takerBalance).awaitTransactionSuccessAsync(
-            {
-                from: owner,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await zrxToken
+            .transfer(takerAddress, takerBalance)
+            .awaitTransactionSuccessAsync(
+                { from: owner },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
 
-        await zrxToken.approve(contractAddresses.erc20Proxy, UNLIMITED_ALLOWANCE).awaitTransactionSuccessAsync(
-            {
-                from: takerAddress,
-            },
-            { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
-        );
+        await zrxToken
+            .approve(contractAddresses.erc20Proxy, UNLIMITED_ALLOWANCE)
+            .awaitTransactionSuccessAsync(
+                { from: takerAddress },
+                { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+            );
     });
     afterEach(async () => {
         await blockchainLifecycle.revertAsync();
@@ -290,7 +293,7 @@ describe('Coordinator server', () => {
                 feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
             });
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -326,7 +329,7 @@ describe('Coordinator server', () => {
         });
         it('should return 400 if batch cancellation transaction not signed by order maker', async () => {
             const order = await orderFactory.newSignedOrderAsync();
-            const data = contractWrappers.exchange.batchCancelOrders([order]).getABIEncodedTransactionData();
+            const data = exchangeContract.batchCancelOrders([order]).getABIEncodedTransactionData();
             const notMakerAddress = takerAddress;
             const signedTransaction = await createSignedTransactionAsync({ data }, notMakerAddress, CHAIN_ID);
             const body = {
@@ -345,7 +348,7 @@ describe('Coordinator server', () => {
             const notCoordinatorOrder = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: NOT_COORDINATOR_FEE_RECIPIENT_ADDRESS,
             });
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .batchCancelOrders([coordinatorOrder, notCoordinatorOrder])
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, makerAddress, CHAIN_ID);
@@ -366,13 +369,19 @@ describe('Coordinator server', () => {
             expect(isSoftCancelled).to.be.true();
             isSoftCancelled = await orderModel.isSoftCancelledAsync(notCoordinatorOrder);
             expect(isSoftCancelled).to.be.false();
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK & mark order as cancelled if successfully batch cancelling orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
             const orderTwo = await orderFactory.newSignedOrderAsync();
-            const data = contractWrappers.exchange
-                .batchCancelOrders([orderOne, orderTwo])
-                .getABIEncodedTransactionData();
+            const data = exchangeContract.batchCancelOrders([orderOne, orderTwo]).getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, makerAddress, CHAIN_ID);
             const body = {
                 signedTransaction,
@@ -391,6 +400,14 @@ describe('Coordinator server', () => {
             expect(isSoftCancelled).to.be.true();
             isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
             expect(isSoftCancelled).to.be.true();
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to batchCancel 2 orders each with a different, supported feeRecipientAddress', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync({
@@ -399,9 +416,7 @@ describe('Coordinator server', () => {
             const orderTwo = await orderFactory.newSignedOrderAsync({
                 feeRecipientAddress: FEE_RECIPIENT_ADDRESS_TWO,
             });
-            const data = contractWrappers.exchange
-                .batchCancelOrders([orderOne, orderTwo])
-                .getABIEncodedTransactionData();
+            const data = exchangeContract.batchCancelOrders([orderOne, orderTwo]).getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, makerAddress, CHAIN_ID);
             const body = {
                 signedTransaction,
@@ -420,10 +435,18 @@ describe('Coordinator server', () => {
             expect(isSoftCancelled).to.be.true();
             isSoftCancelled = await orderModel.isSoftCancelledAsync(orderTwo);
             expect(isSoftCancelled).to.be.true();
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 400 and leave order uncancelled if non-maker tried to cancel an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
-            const data = contractWrappers.exchange.cancelOrder(order).getABIEncodedTransactionData();
+            const data = exchangeContract.cancelOrder(order).getABIEncodedTransactionData();
             const notMakerAddress = owner;
             const signedTransaction = await createSignedTransactionAsync({ data }, notMakerAddress, CHAIN_ID);
             const body = {
@@ -443,7 +466,7 @@ describe('Coordinator server', () => {
         });
         it('should return 200 OK & mark order as cancelled if successfully cancelling an order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
-            const cancelData = contractWrappers.exchange.cancelOrder(order).getABIEncodedTransactionData();
+            const cancelData = exchangeContract.cancelOrder(order).getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data: cancelData }, makerAddress, CHAIN_ID);
             const body = {
                 signedTransaction,
@@ -463,7 +486,7 @@ describe('Coordinator server', () => {
 
             // Check that someone trying to fill the order, can't
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const fillData = contractWrappers.exchange
+            const fillData = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedFillTransaction = await createSignedTransactionAsync(
@@ -485,13 +508,21 @@ describe('Coordinator server', () => {
             );
             const orderHash = orderHashUtils.getOrderHashHex(order);
             expect(fillResponse.body.validationErrors[0].entities).to.be.deep.equal([orderHash]);
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, makerAddress, signedTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK to order cancellation request & return outstandingFillSignatures', async () => {
             const order = await orderFactory.newSignedOrderAsync();
 
             // Request to fill order
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -505,7 +536,7 @@ describe('Coordinator server', () => {
             expect(fillResponse.status).to.be.equal(HttpStatus.OK);
 
             // Once fill request granted, request to cancel order
-            const cancelData = contractWrappers.exchange.cancelOrder(order).getABIEncodedTransactionData();
+            const cancelData = exchangeContract.cancelOrder(order).getABIEncodedTransactionData();
             const signedCancelTransaction = await createSignedTransactionAsync(
                 { data: cancelData },
                 makerAddress,
@@ -531,11 +562,23 @@ describe('Coordinator server', () => {
                 takerAssetFillAmount,
             );
             expect(response.body.cancellationSignatures.length).to.be.equal(1);
+
+            // Execute cancel transaction and validate order was cancelled
+            await coordinatorContract
+                .executeTransaction(signedCancelTransaction, makerAddress, signedCancelTransaction.signature, [])
+                .awaitTransactionSuccessAsync(
+                    { from: makerAddress },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
+            const isCancelledOnChain = await exchangeContract
+                .cancelled(orderHashUtils.getOrderHashHex(order))
+                .callAsync();
+            expect(isCancelledOnChain).to.be.true();
         });
         it('should return 400 if request specifies unsupported chainId', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -561,7 +604,7 @@ describe('Coordinator server', () => {
             });
             const takerAssetFillAmountOne = orderOne.takerAssetAmount;
             const takerAssetFillAmountTwo = orderTwo.takerAssetAmount;
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .batchFillOrders(
                     [orderOne, orderTwo],
                     [takerAssetFillAmountOne, takerAssetFillAmountTwo],
@@ -599,11 +642,22 @@ describe('Coordinator server', () => {
             expect(
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[1].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmountTwo);
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(signedTransaction, txOrigin, signedTransaction.signature, response.body.signatures)
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to fill uncancelled order', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -635,19 +689,13 @@ describe('Coordinator server', () => {
                 (transactionEntityIfExists as TransactionEntity).takerAssetFillAmounts[0].takerAssetFillAmount,
             ).to.be.bignumber.equal(takerAssetFillAmount);
 
-            const coordinatorContract = new CoordinatorContract(contractAddresses.coordinator, provider);
-
+            // Execute signed transaction in coordinator contract
             await coordinatorContract
                 .executeTransaction(signedTransaction, txOrigin, signedTransaction.signature, [
                     response.body.signatures[0],
                 ])
                 .awaitTransactionSuccessAsync(
-                    {
-                        from: takerAddress,
-                        gasPrice: defaultTransactionParams.gasPrice,
-                        gas: testConstants.MAX_EXECUTE_TRANSACTION_GAS,
-                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER,
-                    },
+                    { from: takerAddress },
                     { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
                 );
         });
@@ -658,7 +706,7 @@ describe('Coordinator server', () => {
             const orderOneTakerAssetFillAmount = orderOne.takerAssetAmount;
             const orderTwoTakerAssetFillAmount = orderTwo.takerAssetAmount.div(2);
             const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .marketSellOrdersFillOrKill([orderOne, orderTwo], takerAssetFillAmount, [
                     orderOne.signature,
                     orderTwo.signature,
@@ -705,6 +753,22 @@ describe('Coordinator server', () => {
                 t => t.orderHash === orderHashTwo,
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to marketSellOrdersNoThrow uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -713,7 +777,7 @@ describe('Coordinator server', () => {
             const orderOneTakerAssetFillAmount = orderOne.takerAssetAmount;
             const orderTwoTakerAssetFillAmount = orderTwo.takerAssetAmount.div(2);
             const takerAssetFillAmount = orderOneTakerAssetFillAmount.plus(orderTwoTakerAssetFillAmount);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .marketSellOrdersNoThrow([orderOne, orderTwo], takerAssetFillAmount, [
                     orderOne.signature,
                     orderTwo.signature,
@@ -760,6 +824,22 @@ describe('Coordinator server', () => {
                 t => t.orderHash === orderHashTwo,
             ) as TakerAssetFillAmountEntity;
             expect(takerAssetFillAmountTwo.takerAssetFillAmount).to.be.bignumber.equal(orderTwoTakerAssetFillAmount);
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to marketBuy uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -768,7 +848,7 @@ describe('Coordinator server', () => {
             const orderOneMakerAssetFillAmount = orderOne.makerAssetAmount;
             const orderTwoMakerAssetFillAmount = orderTwo.makerAssetAmount.div(2);
             const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .marketBuyOrdersNoThrow([orderOne, orderTwo], makerAssetFillAmount, [
                     orderOne.signature,
                     orderTwo.signature,
@@ -821,6 +901,22 @@ describe('Coordinator server', () => {
                 takerAssetFillAmountTwo.takerAssetFillAmount,
             );
             expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 200 OK if request to marketBuyFillOrKill uncancelled orders', async () => {
             const orderOne = await orderFactory.newSignedOrderAsync();
@@ -829,7 +925,7 @@ describe('Coordinator server', () => {
             const orderOneMakerAssetFillAmount = orderOne.makerAssetAmount;
             const orderTwoMakerAssetFillAmount = orderTwo.makerAssetAmount.div(2);
             const makerAssetFillAmount = orderOneMakerAssetFillAmount.plus(orderTwoMakerAssetFillAmount);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .marketBuyOrdersFillOrKill([orderOne, orderTwo], makerAssetFillAmount, [
                     orderOne.signature,
                     orderTwo.signature,
@@ -882,11 +978,27 @@ describe('Coordinator server', () => {
                 takerAssetFillAmountTwo.takerAssetFillAmount,
             );
             expect(expectedOrderTwoMakerAssetFillAmount).to.be.bignumber.equal(orderTwoMakerAssetFillAmount);
+
+            // Execute signed transaction in coordinator contract
+            await coordinatorContract
+                .executeTransaction(
+                    signedTransaction,
+                    takerAddress,
+                    signedTransaction.signature,
+                    response.body.signatures,
+                )
+                .awaitTransactionSuccessAsync(
+                    {
+                        from: takerAddress,
+                        value: DEFAULT_PROTOCOL_FEE_MULTIPLIER.times(defaultTransactionParams.gasPrice).times(2),
+                    },
+                    { pollingIntervalMs: testConstants.AWAIT_TRANSACTION_MINED_MS },
+                );
         });
         it('should return 400 TRANSACTION_ALREADY_USED if request same 0x transaction multiple times', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount; // Full amount
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -913,7 +1025,7 @@ describe('Coordinator server', () => {
         it('should return 400 FILL_REQUESTS_EXCEEDED_TAKER_ASSET_AMOUNT if request to fill an order multiple times fully', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount; // Full amount
-            const dataOne = contractWrappers.exchange
+            const dataOne = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransactionOne = await createSignedTransactionAsync({ data: dataOne }, takerAddress, CHAIN_ID);
@@ -930,7 +1042,7 @@ describe('Coordinator server', () => {
             const currTimestamp = utils.getCurrentTimestampSeconds();
             expect(response.body.expirationTimeSeconds).to.be.greaterThan(currTimestamp);
 
-            const dataTwo = contractWrappers.exchange
+            const dataTwo = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransactionTwo = await createSignedTransactionAsync({ data: dataTwo }, takerAddress, CHAIN_ID);
@@ -952,7 +1064,7 @@ describe('Coordinator server', () => {
         it('should return 400 if transaction `expirationTimeSeconds` is too high', async () => {
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const maxApproximateValidExpirationTimeSeconds =
@@ -1001,7 +1113,7 @@ describe('Coordinator server', () => {
                 // Do fill request async
                 const order = await orderFactory.newSignedOrderAsync();
                 const takerAssetFillAmount = order.takerAssetAmount.div(2);
-                const data = contractWrappers.exchange
+                const data = exchangeContract
                     .fillOrder(order, takerAssetFillAmount, order.signature)
                     .getABIEncodedTransactionData();
                 const signedFillTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -1027,7 +1139,7 @@ describe('Coordinator server', () => {
                 await utils.sleepAsync(100);
 
                 // Do cancellation request
-                const cancelData = contractWrappers.exchange.cancelOrder(order).getABIEncodedTransactionData();
+                const cancelData = exchangeContract.cancelOrder(order).getABIEncodedTransactionData();
                 const signedCancelTransaction = await createSignedTransactionAsync(
                     { data: cancelData },
                     makerAddress,
@@ -1088,7 +1200,7 @@ describe('Coordinator server', () => {
             const orderTwo = await orderFactory.newSignedOrderAsync();
             const orderThree = await orderFactory.newSignedOrderAsync();
             const orderFour = await orderFactory.newSignedOrderAsync();
-            const cancelData = contractWrappers.exchange
+            const cancelData = exchangeContract
                 .batchCancelOrders([orderOne, orderTwo, orderThree])
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data: cancelData }, makerAddress, CHAIN_ID);
@@ -1148,7 +1260,7 @@ describe('Coordinator server', () => {
             // Send fill request
             const order = await orderFactory.newSignedOrderAsync();
             const takerAssetFillAmount = order.takerAssetAmount.div(2);
-            const data = contractWrappers.exchange
+            const data = exchangeContract
                 .fillOrder(order, takerAssetFillAmount, order.signature)
                 .getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data }, takerAddress, CHAIN_ID);
@@ -1192,7 +1304,7 @@ describe('Coordinator server', () => {
 
             // Send fill request
             const order = await orderFactory.newSignedOrderAsync();
-            const cancelData = contractWrappers.exchange.cancelOrder(order).getABIEncodedTransactionData();
+            const cancelData = exchangeContract.cancelOrder(order).getABIEncodedTransactionData();
             const signedTransaction = await createSignedTransactionAsync({ data: cancelData }, makerAddress, CHAIN_ID);
             const body = {
                 signedTransaction,
