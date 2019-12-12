@@ -1,6 +1,5 @@
-import { CoordinatorContract, ERC20TokenContract, ExchangeContract } from '@0x/abi-gen-wrappers';
 import { ContractAddresses } from '@0x/contract-addresses';
-import { IAssetDataContract } from '@0x/contracts-asset-proxy';
+import { CoordinatorContract, ERC20TokenContract, ExchangeContract } from '@0x/contract-wrappers';
 import { DummyERC20TokenContract } from '@0x/contracts-erc20';
 import {
     constants as testConstants,
@@ -11,7 +10,7 @@ import {
 } from '@0x/contracts-test-utils';
 import { BlockchainLifecycle, web3Factory } from '@0x/dev-utils';
 import { runMigrationsOnceAsync } from '@0x/migrations';
-import { orderCalculationUtils, SignatureType } from '@0x/order-utils';
+import { assetDataUtils, orderCalculationUtils, SignatureType } from '@0x/order-utils';
 import { Web3ProviderEngine } from '@0x/subproviders';
 import { SignedZeroExTransaction, ZeroExTransaction } from '@0x/types';
 import { BigNumber, fetchAsync } from '@0x/utils';
@@ -106,7 +105,6 @@ describe('Coordinator server', () => {
         };
         provider = web3Factory.getRpcProvider(ganacheConfigs);
 
-        const assetDataEncoder = new IAssetDataContract(testConstants.NULL_ADDRESS, provider);
         web3Wrapper = new Web3Wrapper(provider);
         blockchainLifecycle = new BlockchainLifecycle(web3Wrapper);
 
@@ -127,10 +125,10 @@ describe('Coordinator server', () => {
             ...testConstants.STATIC_ORDER_PARAMS,
             makerAddress,
             feeRecipientAddress,
-            makerAssetData: assetDataEncoder.ERC20Token(DEFAULT_MAKER_TOKEN_ADDRESS).getABIEncodedTransactionData(),
-            takerAssetData: assetDataEncoder.ERC20Token(DEFAULT_TAKER_TOKEN_ADDRESS).getABIEncodedTransactionData(),
-            makerFeeAssetData: assetDataEncoder.ERC20Token(DEFAULT_MAKER_TOKEN_ADDRESS).getABIEncodedTransactionData(),
-            takerFeeAssetData: assetDataEncoder.ERC20Token(DEFAULT_TAKER_TOKEN_ADDRESS).getABIEncodedTransactionData(),
+            makerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
+            takerAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
+            makerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_MAKER_TOKEN_ADDRESS),
+            takerFeeAssetData: assetDataUtils.encodeERC20AssetData(DEFAULT_TAKER_TOKEN_ADDRESS),
             exchangeAddress: contractAddresses.exchange,
             chainId: CHAIN_ID,
             senderAddress: contractAddresses.coordinator,
