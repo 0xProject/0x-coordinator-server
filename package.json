@@ -1,6 +1,6 @@
 {
     "name": "@0x/coordinator-server",
-    "version": "1.0.5",
+    "version": "1.0.6",
     "description": "0x Coordinator reference server implementation",
     "repository": "git@github.com:0xProject/0x-coordinator-server.git",
     "license": "Apache-2.0",
@@ -12,18 +12,20 @@
         "prettier": "prettier --write 'ts/**/*.ts' --config .prettierrc",
         "start": "node ts/lib/src/server.js",
         "lint": "tslint --project ts --format stylish --exclude ts/src/schemas/**/*",
-        "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 10000 --exit"
+        "test": "mocha --require source-map-support/register --require make-promises-safe ts/lib/test/**/*_test.js --timeout 10000 --exit",
+        "postinstall": "node -e \"try{ fs.unlinkSync(path.resolve(path.dirname(require.resolve('ganache-core')), './typings/index.d.ts')) } catch (err) {}\""
     },
     "config": {
         "mnemonic": "concert load couple harbor equip island argue ramp clarify fence smart topic"
     },
     "devDependencies": {
-        "@0x/contracts-erc20": "^3.0.1",
-        "@0x/contracts-test-utils": "^5.0.0",
-        "@0x/dev-utils": "^3.0.1",
-        "@0x/migrations": "^5.0.1",
+        "@0x/contract-artifacts": "^3.6.0",
+        "@0x/contracts-asset-proxy": "^3.2.1",
+        "@0x/contracts-test-utils": "^5.1.5",
+        "@0x/dev-utils": "^3.2.0",
+        "@0x/migrations": "6.2.0",
         "@0x/tslint-config": "^4.0.0",
-        "@0x/web3-wrapper": "^7.0.1",
+        "@0x/web3-wrapper": "7.0.6",
         "@types/cors": "^2.8.4",
         "@types/dotenv": "^6.1.0",
         "@types/express-serve-static-core": "^4.16.11",
@@ -38,8 +40,8 @@
         "dirty-chai": "^2.0.1",
         "dotenv": "^6.2.0",
         "download-cli": "^1.1.1",
-        "ethereum-types": "^3.0.0",
-        "ethereumjs-util": "^6.0.0",
+        "ethereum-types": "^3.1.0",
+        "ethereumjs-util": "^6.2.0",
         "make-promises-safe": "^1.1.0",
         "mocha": "^4.1.0",
         "prettier": "^1.14.3",
@@ -49,15 +51,16 @@
         "typescript": "3.0.1"
     },
     "dependencies": {
-        "@0x/assert": "^3.0.1",
-        "@0x/types": "^3.1.0",
-        "@0x/contract-addresses": "^4.0.0",
-        "@0x/contract-wrappers": "^13.1.0",
-        "@0x/json-schemas": "^5.0.1",
-        "@0x/order-utils": "^10.0.0",
-        "@0x/subproviders": "^6.0.1",
-        "@0x/typescript-typings": "^5.0.0",
-        "@0x/utils": "^5.1.0",
+        "@0x/assert": "3.0.6",
+        "@0x/contract-addresses": "4.6.0",
+        "@0x/contract-wrappers": "13.6.0",
+        "@0x/contracts-erc20": "3.1.1",
+        "@0x/json-schemas": "5.0.6",
+        "@0x/order-utils": "10.2.1",
+        "@0x/subproviders": "6.0.7",
+        "@0x/types": "3.1.2",
+        "@0x/typescript-typings": "5.0.2",
+        "@0x/utils": "5.4.0",
         "@babel/polyfill": "^7.0.0",
         "body-parser": "^1.18.3",
         "cors": "^2.8.5",
@@ -73,6 +76,6 @@
         "websocket": "^1.0.25"
     },
     "resolutions": {
-        "ganache-core": "2.6.0"
+        "ganache-core": "^2.9.0-istanbul.0"
     }
 }

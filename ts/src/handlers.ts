@@ -640,7 +640,7 @@ export class Handlers {
         approvalExpirationTimeSeconds: number,
     ): Promise<RequestTransactionResponse> {
         const contractWrappers = this._chainIdToContractWrappers[chainId];
-        const typedData = await eip712Utils.createCoordinatorApprovalTypedDataAsync(
+        const typedData = eip712Utils.createCoordinatorApprovalTypedData(
             signedTransaction,
             contractWrappers.coordinator.address,
             txOrigin,
