@@ -69,7 +69,7 @@
         "lodash": "^4.17.11",
         "reflect-metadata": "^0.1.10",
         "sqlite3": "^4.0.2",
-        "typeorm": "0.2.7",
+        "typeorm": "0.2.25",
         "websocket": "^1.0.25"
     },
     "resolutions": {
